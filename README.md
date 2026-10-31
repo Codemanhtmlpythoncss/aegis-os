@@ -35,6 +35,10 @@ sudo ./build.sh --arch both        # or: --arch amd64 / --arch arm64
 Boot the resulting `aegis-*.iso` in a VM, double-click **Install Aegis**, pick your
 options, and let it install. Full details: [`docs/BUILD.md`](docs/BUILD.md).
 
+**One image, every medium** → [`docs/MEDIA.md`](docs/MEDIA.md): the hybrid ISO runs
+**live from a USB stick** (amnesic) *and* installs **permanently onto an SSD** (encrypted,
+via the installer). Use [`scripts/write-usb.sh`](scripts/write-usb.sh) to write a stick.
+
 **Prebuilt ISOs:** the GitHub Actions workflow (`.github/workflows/build.yml`) builds
 **both** architectures on Linux runners and attaches them to a Release — so you can grab an
 ISO without building, and anyone can still build their own. (ISOs can't be compiled on
