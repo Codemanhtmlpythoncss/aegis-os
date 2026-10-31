@@ -10,6 +10,7 @@ for base in binary/boot/grub binary/boot/syslinux binary/isolinux binary/syslinu
         sed -i \
             -e 's@Debian GNU/Linux@Aegis OS@g' \
             -e 's@Debian Live@Aegis OS@g' \
+            -e 's@Live system@Aegis OS@g' \
             -e 's@Debian@Aegis@g' \
             "$f" 2>/dev/null || true
     done

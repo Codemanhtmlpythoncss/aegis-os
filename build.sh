@@ -92,12 +92,14 @@ build_one() {
   # getting it right per-arch is what makes the arm64 boot test actually work.
   local SERCON="ttyS0,115200"
   [ "$arch" = arm64 ] && SERCON="ttyAMA0,115200"
-  # No 'quiet splash': a verbose boot means a VM never looks like a dead black
-  # screen — you see kernel/systemd progress. tty0 stays primary for the desktop.
-  local BOOTAPPEND="boot=live components console=$SERCON console=tty0 \
+  # Serial LAST = primary console, so systemd status + the login prompt go to the
+  # serial port (what the CI boot smoke-test reads). tty0 is also listed, so the
+  # screen still shows the (verbose, no 'quiet splash') boot. No loglevel=0, so the
+  # boot is actually visible.
+  local BOOTAPPEND="boot=live components console=tty0 console=$SERCON \
 init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 page_poison=1 slab_nomerge \
 randomize_kstack_offset=on vsyscall=none debugfs=off \
-lockdown=confidentiality mce=0 loglevel=0 ipv6.disable=1 \
+lockdown=confidentiality mce=0 ipv6.disable=1 \
 intel_iommu=on amd_iommu=on efi=disable_early_pci_dma \
 mitigations=auto,nosmt"
 

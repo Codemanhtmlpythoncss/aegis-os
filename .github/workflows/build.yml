@@ -92,10 +92,12 @@ jobs:
           if [ -w /dev/kvm ]; then ACCEL="-enable-kvm -cpu host"; else echo "no KVM access -> TCG (slower)"; ACCEL="-cpu max"; fi
           if [ "${{ matrix.arch }}" = amd64 ]; then
             qemu-system-x86_64 $ACCEL -m 2048 -smp 2 -cdrom "$ISO" \
+              -nic user,model=virtio-net-pci \
               -display none -serial file:serial.log -no-reboot &
           else
             qemu-system-aarch64 $ACCEL -machine virt -m 2048 -smp 2 \
               -bios /usr/share/AAVMF/AAVMF_CODE.fd -cdrom "$ISO" \
+              -nic user,model=virtio-net-pci \
               -display none -serial file:serial.log -no-reboot &
           fi
           QPID=$!
@@ -107,6 +109,12 @@ jobs:
           done
           kill "$QPID" 2>/dev/null || true
           echo "---- serial.log tail ----"; tail -n 50 serial.log 2>/dev/null || true
+          # Also fail if a critical service failed to start (catches boot regressions
+          # like the firewall job-cascade that a 'reached login' check alone misses).
+          if [ "$OK" = 1 ] && grep -qE "Failed to start (NetworkManager|aegis-netmode|tor@default|systemd-user-sessions|i2pd)" serial.log 2>/dev/null; then
+            echo "CRITICAL SERVICE(S) FAILED:"; grep -E "Failed to start (NetworkManager|aegis-netmode|tor@default|systemd-user-sessions|i2pd)" serial.log | sort -u
+            OK=0
+          fi
           if [ "$OK" = 1 ]; then echo "BOOT SMOKE-TEST PASSED"; else echo "BOOT SMOKE-TEST FAILED"; exit 1; fi
 
   # Runs on the HOST runner (gh CLI is present here, unlike the Debian container).
