@@ -1,0 +1,17 @@
+#!/bin/sh
+# Aegis BINARY-stage hook: rebrand the ISO boot menu from "Debian" to "Aegis OS".
+# Runs after live-build has generated the GRUB/isolinux bootloader configs.
+set -e
+echo "I: [aegis] rebranding bootloader menu (Debian -> Aegis OS)"
+
+for base in binary/boot/grub binary/boot/syslinux binary/isolinux binary/syslinux; do
+    [ -d "$base" ] || continue
+    find "$base" -type f \( -name '*.cfg' -o -name '*.conf' \) 2>/dev/null | while read -r f; do
+        sed -i \
+            -e 's@Debian GNU/Linux@Aegis OS@g' \
+            -e 's@Debian Live@Aegis OS@g' \
+            -e 's@Debian@Aegis@g' \
+            "$f" 2>/dev/null || true
+    done
+done
+echo "I: [aegis] bootloader rebrand done"
