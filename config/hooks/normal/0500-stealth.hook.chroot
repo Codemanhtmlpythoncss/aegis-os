@@ -1,0 +1,36 @@
+#!/bin/sh
+# Aegis chroot hook: "as invisible as possible" — stop the host from announcing
+# itself on the network and from leaking identity/time via clearnet.
+# Honest note: this lowers your profile and forensic trace; it does NOT make you
+# undetectable to a global adversary or someone who can watch both ends of Tor.
+set -e
+echo "I: [aegis] 0500 stealth"
+
+[ -r /etc/aegis/build.env ] && . /etc/aegis/build.env || true
+: "${AEGIS_STEALTH:=yes}"
+[ "$AEGIS_STEALTH" = yes ] || { echo "I: [aegis] 0500 skipped (stealth off)"; exit 0; }
+
+# --- kill chatty LAN-discovery services ---
+apt-get purge -y avahi-daemon avahi-utils 2>/dev/null || true   # mDNS/Bonjour broadcaster
+systemctl mask avahi-daemon.service avahi-daemon.socket 2>/dev/null || true
+# NetBIOS/SMB announce (only present if samba pulled in)
+systemctl disable --now nmbd smbd 2>/dev/null || true
+
+# --- no clearnet NTP: disable timesyncd, use aegis-tordate instead ---
+systemctl disable --now systemd-timesyncd 2>/dev/null || true
+systemctl mask systemd-timesyncd 2>/dev/null || true
+systemctl enable aegis-tordate.service 2>/dev/null || true
+
+# --- radios off by default (no Bluetooth beaconing); user re-enables if wanted ---
+mkdir -p /etc/modprobe.d
+cat > /etc/modprobe.d/aegis-radios.conf <<'EOF'
+# Block Bluetooth + webcam modules at boot (rfkill/unblock to use them).
+blacklist bluetooth
+blacklist btusb
+blacklist uvcvideo
+EOF
+
+# --- resolved: make sure mDNS/LLMNR stay off even if NM hands off to resolved ---
+systemctl enable systemd-resolved 2>/dev/null || true
+
+echo "I: [aegis] 0500 done"

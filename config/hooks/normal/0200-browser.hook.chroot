@@ -1,0 +1,35 @@
+#!/bin/sh
+# Aegis chroot hook: Firefox ESR base hardening for the LIVE image.
+# (Swapping to Tor Browser / Mullvad / LibreWolf is an INSTALL-time choice handled
+# by aegis-apply; this only hardens the firefox-esr that ships in the live base.)
+set -e
+echo "I: [aegis] 0200 firefox-harden (live base)"
+
+FFPREF=/usr/lib/firefox-esr/browser/defaults/preferences
+mkdir -p "$FFPREF"
+cat > "$FFPREF/aegis-hardening.js" <<'JS'
+// Aegis Firefox hardening (arkenfox-lite). policies.json locks the big switches.
+pref("privacy.resistFingerprinting", true);
+pref("privacy.trackingprotection.enabled", true);
+pref("privacy.partition.network_state", true);
+pref("network.cookie.cookieBehavior", 5);
+pref("network.http.referer.XOriginPolicy", 2);
+pref("network.http.referer.XOriginTrimmingPolicy", 2);
+pref("network.dns.disablePrefetch", true);
+pref("network.predictor.enabled", false);
+pref("network.prefetch-next", false);
+pref("media.peerconnection.enabled", false);         // no WebRTC IP leak
+pref("webgl.disabled", true);
+pref("geo.enabled", false);
+pref("beacon.enabled", false);
+pref("browser.send_pings", false);
+pref("toolkit.telemetry.enabled", false);
+pref("datareporting.healthreport.uploadEnabled", false);
+pref("app.shield.optoutstudies.enabled", false);
+pref("signon.rememberSignons", false);
+pref("browser.formfill.enable", false);
+pref("places.history.enabled", false);               // amnesic by default
+pref("network.trr.mode", 5);                          // DNS via system -> Tor, not DoH
+JS
+
+echo "I: [aegis] 0200 done"

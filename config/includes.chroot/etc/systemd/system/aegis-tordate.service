@@ -1,0 +1,12 @@
+# Sync the clock over Tor once Tor is up (replaces clearnet NTP).
+[Unit]
+Description=Aegis time sync over Tor
+After=tor.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/aegis-tordate
+
+[Install]
+WantedBy=multi-user.target

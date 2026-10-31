@@ -1,0 +1,4 @@
+# Mullvad Browser — Tor-Browser engine tuned for use WITHOUT Tor (e.g. over your own VPN
+# or I2P-adjacent). Excellent anti-fingerprinting, NOT Chromium-based.
+# Not in Debian main: installed from Mullvad's APT repo by hook 0510-mullvad-browser.
+# (This list intentionally has no packages; the hook adds the repo + package.)

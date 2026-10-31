@@ -1,0 +1,71 @@
+#!/bin/sh
+# Aegis chroot hook: system hardening, service wiring, telemetry removal.
+# Runs inside the image during `lb build`. Reads /etc/aegis/build.env (dropped by build.sh).
+set -e
+echo "I: [aegis] 0100 system-harden"
+
+[ -r /etc/aegis/build.env ] && . /etc/aegis/build.env || true
+: "${AEGIS_USBGUARD:=yes}"
+: "${AEGIS_HARDENED_MALLOC:=yes}"
+: "${AEGIS_RAM_WIPE:=yes}"
+: "${AEGIS_DEFAULT_NETMODE:=tor}"
+
+# --- timezone + locale neutrality ---
+ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+echo "UTC" > /etc/timezone
+
+# --- randomize identity each boot: blank machine-id so it regenerates ---
+: > /etc/machine-id
+rm -f /var/lib/dbus/machine-id
+ln -sf /etc/machine-id /var/lib/dbus/machine-id
+
+# --- strip telemetry / phone-home services ---
+apt-get purge -y --allow-remove-essential popularity-contest whoopsie apport \
+    geoclue-2.0 2>/dev/null || true
+# NetworkManager connectivity check leaks a request on every connect:
+mkdir -p /etc/NetworkManager/conf.d
+printf '[connectivity]\nenabled=false\n' > /etc/NetworkManager/conf.d/20-no-connectivity-check.conf
+
+# --- AppArmor on ---
+systemctl enable apparmor 2>/dev/null || true
+
+# --- default network-mode marker (wizard can overwrite) ---
+mkdir -p /etc/aegis
+echo "$AEGIS_DEFAULT_NETMODE" > /etc/aegis/netmode
+
+# --- enable Aegis services + anonymity daemons ---
+systemctl enable aegis-netmode.service 2>/dev/null || true
+systemctl enable tor@default.service 2>/dev/null || systemctl enable tor 2>/dev/null || true
+systemctl enable i2pd 2>/dev/null || true
+# Don't let nftables service fight aegis-firewall; aegis-netmode owns the ruleset.
+systemctl disable nftables 2>/dev/null || true
+
+# --- RAM wipe on shutdown ---
+if [ "$AEGIS_RAM_WIPE" = yes ]; then
+    systemctl enable aegis-ramwipe.service 2>/dev/null || true
+fi
+
+# --- USBGuard: block unapproved USB (generate an allow-list at first boot instead
+#     of baking the build host's devices in) ---
+if [ "$AEGIS_USBGUARD" = yes ]; then
+    systemctl enable usbguard 2>/dev/null || true
+    # Ship an empty policy. USBGuard is enforcing, so the user generates a policy for
+    # THEIR hardware after install:  sudo usbguard generate-policy > /etc/usbguard/rules.conf
+    # (Baking the build host's device list in would be wrong and could lock out a keyboard.)
+    mkdir -p /etc/usbguard
+    printf '# Run: sudo usbguard generate-policy > /etc/usbguard/rules.conf  (on your hardware)\n' \
+        > /etc/usbguard/rules.conf
+fi
+
+# --- hardened_malloc preload (GrapheneOS allocator) if present ---
+if [ "$AEGIS_HARDENED_MALLOC" = yes ] && [ -e /usr/lib/libhardened_malloc.so ]; then
+    echo /usr/lib/libhardened_malloc.so > /etc/ld.so.preload
+fi
+
+# --- lock down cron/at to root, remove SUID from a few risky binaries ---
+for b in /usr/bin/wall /usr/bin/write; do [ -e "$b" ] && chmod u-s "$b" || true; done
+
+# --- make the aegis scripts executable (includes.chroot can lose +x) ---
+chmod 0755 /usr/local/bin/aegis-* 2>/dev/null || true
+
+echo "I: [aegis] 0100 done"

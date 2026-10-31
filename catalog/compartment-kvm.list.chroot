@@ -1,0 +1,13 @@
+# KVM/libvirt compartmentalization (installer option "VM isolation").
+# Lets you run risky apps or a whole workstation inside a VM whose only route out
+# is Tor — the Whonix model. Strong isolation, but NOT a Xen type-1 hypervisor,
+# so not literally Qubes (see docs/DESIGN.md).
+qemu-system-x86
+qemu-system-arm
+qemu-utils
+libvirt-daemon-system
+libvirt-clients
+virt-manager
+bridge-utils
+dnsmasq-base
+ovmf

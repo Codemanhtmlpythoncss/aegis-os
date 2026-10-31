@@ -1,0 +1,15 @@
+# Runs the RAM wipe as the very last step before power-off / reboot.
+[Unit]
+Description=Aegis RAM wipe (anti cold-boot)
+DefaultDependencies=no
+After=final.target
+Before=shutdown.target
+Conflicts=reboot.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/aegis-ramwipe
+TimeoutStartSec=30
+
+[Install]
+WantedBy=final.target

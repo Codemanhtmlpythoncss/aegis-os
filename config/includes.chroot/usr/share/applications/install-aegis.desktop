@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Install Aegis
+Comment=Choose your options and install Aegis OS to disk (with encryption)
+Exec=aegis-installer
+Icon=system-software-install
+Terminal=false
+Categories=System;
+Keywords=install;calamares;setup;tor;i2p;

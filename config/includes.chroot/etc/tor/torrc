@@ -1,0 +1,26 @@
+# Aegis torrc — transparent proxy + DNS, matching /etc/nftables-tor.conf.
+# Keep this in sync with aegis-firewall.
+
+# SOCKS for apps that are Tor-aware (Firefox proxy, torsocks).
+SocksPort 9050
+SocksPort 127.0.0.1:9150
+
+# Transparent proxy target for the nftables redirect.
+TransPort 127.0.0.1:9040 IsolateClientAddr IsolateSOCKSAuth IsolateClientProtocol IsolateDestPort IsolateDestAddr
+
+# DNS over Tor.
+DNSPort 127.0.0.1:5353
+AutomapHostsOnResolve 1
+AutomapHostsSuffixes .onion,.exit
+VirtualAddrNetworkIPv4 10.192.0.0/10
+
+# Stream isolation hardening.
+SafeSocks 1
+
+# Pluggable transports available if your network blocks Tor (enable in wizard):
+#ClientTransportPlugin obfs4 exec /usr/bin/obfs4proxy
+#UseBridges 1
+#Bridge obfs4 <paste-your-bridge-line-here>
+
+# Don't act as a relay/exit.
+ExitRelay 0

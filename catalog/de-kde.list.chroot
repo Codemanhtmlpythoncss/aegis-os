@@ -1,0 +1,7 @@
+# KDE Plasma — middleweight; good balance of features vs resources.
+kde-plasma-desktop
+sddm
+konsole
+dolphin
+xserver-xorg
+xorg

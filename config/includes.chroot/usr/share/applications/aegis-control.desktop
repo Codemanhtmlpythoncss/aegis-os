@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Aegis Control
+Comment=Switch network mode (Tor/I2P) and toggle MAC spoofing — applies now
+Exec=aegis-control
+Icon=preferences-system-network
+Terminal=false
+Categories=Settings;Security;
+Keywords=tor;i2p;mac;network;privacy;

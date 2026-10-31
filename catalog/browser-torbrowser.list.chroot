@@ -1,0 +1,3 @@
+# Tor Browser via the official launcher (verifies signatures, fetches on first run).
+# Strongest fingerprinting resistance when using Tor. NOT Chromium-based.
+torbrowser-launcher

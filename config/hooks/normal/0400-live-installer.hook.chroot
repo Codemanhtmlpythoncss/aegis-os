@@ -1,0 +1,23 @@
+#!/bin/sh
+# Aegis chroot hook: set up the on-desktop installer in the LIVE image.
+# - seeds /etc/calamares with stock module examples, then overlays Aegis config
+# - puts an "Install Aegis" launcher on the live desktop
+set -e
+echo "I: [aegis] 0400 live-installer"
+
+# Seed stock Calamares module examples as a base (partition/users/bootloader/etc.),
+# then our build.sh-staged /etc/calamares/{settings.conf,branding,modules} overlays them.
+if [ -d /usr/share/calamares/modules ] && [ ! -e /etc/calamares/modules/partition.conf ]; then
+    mkdir -p /etc/calamares/modules
+    cp -an /usr/share/calamares/modules/. /etc/calamares/modules/ 2>/dev/null || true
+fi
+# Debian ships example branding too; keep ours as the active one.
+mkdir -p /etc/calamares/branding
+
+# Put the installer launcher on the live user's desktop (live user via /etc/skel).
+mkdir -p /etc/skel/Desktop
+cp -f /usr/share/applications/install-aegis.desktop /etc/skel/Desktop/ 2>/dev/null || true
+# Make desktop launchers trusted by default (XFCE/GNOME don't nag).
+chmod +x /etc/skel/Desktop/install-aegis.desktop 2>/dev/null || true
+
+echo "I: [aegis] 0400 done"

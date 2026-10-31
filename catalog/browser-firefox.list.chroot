@@ -1,0 +1,6 @@
+# Hardened Firefox ESR. NOT Chromium-based (as requested).
+# Extensions + arkenfox-style user.js are applied by hook 0500-firefox-harden.
+firefox-esr
+# webext packages available in Debian (installed system-wide where possible):
+webext-ublock-origin-firefox
+# NoScript / others are fetched by the hardening hook into the distribution dir.

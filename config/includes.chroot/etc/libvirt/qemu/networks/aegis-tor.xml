@@ -1,0 +1,13 @@
+<!-- Aegis isolated VM network. No <forward> = host-only (no direct NAT to the
+     internet). aegis-vm-setup adds nftables rules that route this subnet through
+     the host's Tor TransPort, so any VM attached here is Tor-only (Whonix model).
+     10.152.152.0/24 mirrors Whonix's subnet on purpose. -->
+<network>
+  <name>aegis-tor</name>
+  <bridge name='aegistor0' stp='on' delay='0'/>
+  <ip address='10.152.152.1' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='10.152.152.10' end='10.152.152.100'/>
+    </dhcp>
+  </ip>
+</network>

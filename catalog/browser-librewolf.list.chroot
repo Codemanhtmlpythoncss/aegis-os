@@ -1,0 +1,3 @@
+# LibreWolf — de-telemetried Firefox fork. NOT Chromium-based.
+# Added from the LibreWolf APT repo by hook 0520-librewolf.
+# (No packages here; the hook adds the repo + package.)

@@ -1,0 +1,39 @@
+# --- build outputs ---
+*.iso
+*.iso.sha256
+*.log
+*.img
+
+# --- live-build working/generated dirs ---
+.build/
+chroot/
+chroot.packages.*
+binary/
+binary.modified/
+tftpboot/
+cache/
+auto/
+local/
+
+# --- live-build's own generated config files (we ship only package-lists/hooks/includes) ---
+config/binary
+config/bootstrap
+config/chroot
+config/common
+config/source
+config/hooks/live/
+config/includes.binary/
+config/package-lists/live
+config/package-lists/firmware*
+
+# --- staged by build.sh from the canonical sources (regenerated each build) ---
+config/includes.chroot/etc/aegis/build.env
+config/includes.chroot/etc/calamares/
+config/includes.chroot/usr/share/aegis/
+config/package-lists/de-xfce.list.chroot
+config/package-lists/browser-firefox.list.chroot
+
+# --- python / editor cruft ---
+__pycache__/
+*.pyc
+.DS_Store

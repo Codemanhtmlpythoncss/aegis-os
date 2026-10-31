@@ -1,0 +1,64 @@
+# Aegis core — always installed, every profile/DE.
+# Base system, firewall, sandboxing, hardening, and live tooling.
+
+# --- live system + boot ---
+# (the kernel is added automatically by live-build for the target architecture)
+live-boot
+live-config
+live-config-systemd
+firmware-linux-free
+
+# --- firewall / networking ---
+nftables
+network-manager
+network-manager-gnome
+macchanger
+resolvconf
+rfkill
+wireless-tools
+iw
+
+# --- sandboxing & mandatory access control ---
+firejail
+firejail-profiles
+bubblewrap
+apparmor
+apparmor-profiles
+apparmor-profiles-extra
+apparmor-utils
+
+# --- device / boot security ---
+usbguard
+secure-delete
+
+# --- crypto / disk ---
+cryptsetup
+cryptsetup-initramfs
+keepassxc
+gnupg
+gnupg-agent
+scdaemon
+
+# --- privacy utilities ---
+mat2
+python3-gi
+python3-nautilus
+
+# --- base userland ---
+sudo
+curl
+wget
+ca-certificates
+less
+vim-tiny
+htop
+pciutils
+usbutils
+console-setup
+
+# --- Aegis control apps need these ---
+python3
+python3-gi
+gir1.2-gtk-3.0
+gir1.2-notify-0.7
+policykit-1

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=I2P Manager
+Comment=Start/stop I2P, watch tunnels and bandwidth, open the router console
+Exec=aegis-i2p-manager
+Icon=network-vpn
+Terminal=false
+Categories=Network;Security;
+Keywords=i2p;anonymity;eepsite;proxy;

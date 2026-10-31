@@ -1,0 +1,54 @@
+{
+  "policies": {
+    "DisableTelemetry": true,
+    "DisableFirefoxStudies": true,
+    "DisablePocket": true,
+    "DisableFirefoxAccounts": true,
+    "DisableFormHistory": true,
+    "DisableFeedbackCommands": true,
+    "DisableSetDesktopBackground": false,
+    "DontCheckDefaultBrowser": true,
+    "NoDefaultBookmarks": true,
+    "OfferToSaveLogins": false,
+    "PasswordManagerEnabled": false,
+    "NetworkPrediction": false,
+    "SearchSuggestEnabled": false,
+    "FirefoxHome": {
+      "Search": true, "TopSites": false, "SponsoredTopSites": false,
+      "Highlights": false, "Pocket": false, "SponsoredPocket": false, "Snippets": false
+    },
+    "UserMessaging": {
+      "WhatsNew": false, "ExtensionRecommendations": false, "FeatureRecommendations": false,
+      "UrlbarInterventions": false, "SkipOnboarding": true
+    },
+    "EnableTrackingProtection": {
+      "Value": true, "Locked": true, "Cryptomining": true, "Fingerprinting": true
+    },
+    "DNSOverHTTPS": {
+      "Enabled": false,
+      "Locked": true,
+      "_comment": "Off on purpose: DNS must go through the system resolver -> Tor DNSPort, not Cloudflare."
+    },
+    "Preferences": {
+      "privacy.resistFingerprinting": { "Value": true, "Status": "locked" },
+      "privacy.firstparty.isolate": { "Value": true, "Status": "locked" },
+      "network.cookie.cookieBehavior": { "Value": 5, "Status": "default" },
+      "media.peerconnection.enabled": { "Value": false, "Status": "locked" },
+      "webgl.disabled": { "Value": true, "Status": "default" },
+      "geo.enabled": { "Value": false, "Status": "locked" },
+      "beacon.enabled": { "Value": false, "Status": "locked" },
+      "browser.safebrowsing.malware.enabled": { "Value": false, "Status": "default" },
+      "browser.safebrowsing.phishing.enabled": { "Value": false, "Status": "default" }
+    },
+    "ExtensionSettings": {
+      "uBlock0@raymondhill.net": {
+        "installation_mode": "force_installed",
+        "install_url": "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi"
+      },
+      "{73a6fe31-595d-460b-a920-fcc0f8843232}": {
+        "installation_mode": "normal_installed",
+        "install_url": "https://addons.mozilla.org/firefox/downloads/latest/noscript/latest.xpi"
+      }
+    }
+  }
+}

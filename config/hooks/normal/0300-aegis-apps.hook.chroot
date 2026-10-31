@@ -1,0 +1,23 @@
+#!/bin/sh
+# Aegis chroot hook: wire up control apps for the live + installed system.
+#   aegis-i2p-manager  -> I2P Manager GUI
+#   aegis-control      -> runtime toggles (network mode, MAC) — reuses aegis_options.py
+# build.sh has already copied the app sources into /usr/share/aegis/.
+set -e
+echo "I: [aegis] 0300 aegis-apps"
+
+cat > /usr/local/bin/aegis-i2p-manager <<'EOF'
+#!/bin/sh
+exec python3 /usr/share/aegis/i2p-manager/i2p_manager.py "$@"
+EOF
+
+cat > /usr/local/bin/aegis-control <<'EOF'
+#!/bin/sh
+# Runtime toggles (applies immediately). Install-time choices are shown read-only.
+exec python3 /usr/share/aegis/setup-wizard/aegis_options.py "$@"
+EOF
+
+chmod 0755 /usr/local/bin/aegis-i2p-manager /usr/local/bin/aegis-control
+chmod 0755 /usr/local/bin/aegis-* 2>/dev/null || true
+
+echo "I: [aegis] 0300 done"

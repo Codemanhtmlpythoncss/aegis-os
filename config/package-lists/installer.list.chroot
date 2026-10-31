@@ -1,0 +1,21 @@
+# On-ISO graphical installer (Calamares) + the backends it needs to partition,
+# encrypt and install a bootloader to the target. Lives in the live image only;
+# aegis-apply purges calamares from the installed system afterwards.
+calamares
+# partitioning / filesystem backends
+parted
+gparted
+dosfstools
+e2fsprogs
+btrfs-progs
+cryptsetup
+cryptsetup-initramfs
+lvm2
+# bootloader install onto the target (both BIOS + UEFI)
+grub-efi-amd64-bin
+grub-pc-bin
+grub2-common
+os-prober
+efibootmgr
+# polkit so the desktop launcher can elevate
+policykit-1

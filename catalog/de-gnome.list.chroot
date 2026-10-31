@@ -1,0 +1,8 @@
+# GNOME — heavier; offered but not recommended for the "lightweight" goal.
+gnome-core
+gdm3
+gnome-terminal
+nautilus
+gnome-tweaks
+xserver-xorg
+xorg

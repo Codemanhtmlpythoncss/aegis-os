@@ -1,0 +1,16 @@
+# XFCE — the default DE. Lightweight, the reason Aegis feels faster than Tails.
+xfce4
+xfce4-goodies
+xfce4-terminal
+xfce4-whiskermenu-plugin
+thunar
+thunar-archive-plugin
+lightdm
+lightdm-gtk-greeter
+network-manager-gnome
+blueman
+pavucontrol
+pulseaudio
+xserver-xorg
+xorg
+# dark, low-distraction defaults handled by includes.chroot

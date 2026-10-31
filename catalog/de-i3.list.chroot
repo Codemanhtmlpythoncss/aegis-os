@@ -1,0 +1,12 @@
+# i3 — minimal tiling WM. Lowest resource footprint of the options.
+i3
+i3status
+i3lock
+dmenu
+lightdm
+lightdm-gtk-greeter
+xfce4-terminal
+thunar
+network-manager-gnome
+xserver-xorg
+xorg

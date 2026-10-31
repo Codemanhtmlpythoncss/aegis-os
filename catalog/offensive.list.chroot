@@ -1,0 +1,11 @@
+# OFFENSIVE profile ONLY. Authorized security testing / CTF use.
+# These are the Kali metapackages, pulled from a pinned Kali repo added by
+# hook 0900-kali-repo (offensive profile only). This massively increases attack
+# surface — see docs/DESIGN.md "Honest limits". Do NOT ship this on a daily driver.
+#
+# Pick ONE tier by editing build.sh KALI_METAPACKAGE:
+#   kali-linux-headless  -> core CLI toolset (default, sane size)
+#   kali-linux-default   -> the standard Kali desktop toolset
+#   kali-linux-large     -> big toolset
+#   kali-linux-everything-> literally everything (huge; not recommended)
+kali-linux-headless

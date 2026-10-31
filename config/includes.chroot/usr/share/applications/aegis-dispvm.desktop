@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Disposable Terminal
+Comment=A throwaway sandbox (fresh home, wiped on exit) — traffic still via Tor
+Exec=aegis-dispvm xfce4-terminal
+Icon=utilities-terminal
+Terminal=false
+Categories=System;Security;
+Keywords=sandbox;disposable;firejail;isolation;

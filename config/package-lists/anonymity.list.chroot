@@ -1,0 +1,17 @@
+# Aegis anonymity layer — Tor + I2P.
+# i2pd (C++) is chosen over the Java I2P router deliberately: far lower RAM/CPU,
+# which is the whole point of "not resource-stealing".
+
+# --- Tor ---
+tor
+tor-geoipdb
+torsocks
+nyx
+# onion-grater / circuit monitor
+obfs4proxy
+
+# --- I2P (lightweight C++ implementation) ---
+i2pd
+
+# DNS resolution over the anonymity layer
+dnsutils

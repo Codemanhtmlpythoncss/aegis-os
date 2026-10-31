@@ -1,0 +1,11 @@
+# Aegis privacy/anti-forensics userland — always on.
+mat2
+secure-delete
+bleachbit
+keepassxc
+# metadata-free screenshots / image tools
+scrot
+# password / secrets
+pwgen
+# optional VPN client for layering (WireGuard)
+wireguard-tools
