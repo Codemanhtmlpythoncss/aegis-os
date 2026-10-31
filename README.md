@@ -32,8 +32,10 @@ sudo apt install -y live-build debootstrap xorriso squashfs-tools mtools dosfsto
 sudo ./build.sh --arch both        # or: --arch amd64 / --arch arm64
 ```
 
-Boot the resulting `aegis-*.iso` in a VM, double-click **Install Aegis**, pick your
-options, and let it install. Full details: [`docs/BUILD.md`](docs/BUILD.md).
+Boot the resulting `aegis-*.iso` — **the installer launches automatically** (like a
+normal install disc); pick your options and let it install. Don't want to install?
+Just **close the installer** and you're in the live, amnesic desktop. Full details:
+[`docs/BUILD.md`](docs/BUILD.md).
 
 **One image, every medium** → [`docs/MEDIA.md`](docs/MEDIA.md): the hybrid ISO runs
 **live from a USB stick** (amnesic) *and* installs **permanently onto an SSD** (encrypted,

@@ -66,6 +66,39 @@ stage_payload() {
 
   cp -f catalog/de-xfce.list.chroot         config/package-lists/
   cp -f catalog/browser-firefox.list.chroot config/package-lists/
+
+  # --- bootloader: AUTO-BOOT (finite timeout) + brand the menu as Aegis ---
+  # live-build generates the GRUB/isolinux config late (after binary hooks), so a
+  # post-build sed can't reliably touch it. Override the templates the supported
+  # way: copy live-build's defaults into config/bootloaders/ and patch them. The
+  # stock GRUB config.cfg has NO timeout, so GRUB waits forever for a keypress —
+  # this adds a 5s timeout so the ISO boots on its own, like an install disc.
+  rm -rf config/bootloaders
+  local BL_SRC=/usr/share/live/build/bootloaders
+  if [ -d "$BL_SRC" ]; then
+    mkdir -p config/bootloaders
+    for d in "$BL_SRC"/*/; do cp -a "$d" "config/bootloaders/$(basename "$d")"; done
+    # GRUB: force a 5-second auto-boot timeout.
+    for c in config/bootloaders/*/config.cfg; do
+      [ -f "$c" ] || continue
+      if grep -q '^set timeout=' "$c"; then
+        sed -i 's/^set timeout=.*/set timeout=5/' "$c"
+      else
+        sed -i '1i set timeout=5\nset timeout_style=menu' "$c"
+      fi
+    done
+    # ISOLINUX/SYSLINUX (BIOS boot, e.g. amd64 in QEMU): 5s timeout, boot default.
+    for c in config/bootloaders/isolinux/*.cfg config/bootloaders/syslinux/*.cfg; do
+      [ -f "$c" ] || continue
+      sed -i 's/^timeout .*/timeout 50/; s/^prompt .*/prompt 0/' "$c"
+    done
+    # Brand the visible menu text (both GRUB and isolinux).
+    find config/bootloaders -name '*.cfg' -type f -exec \
+      sed -i 's/Live system/Aegis OS/g; s@Debian GNU/Linux@Aegis OS@g; s/Debian Live/Aegis OS/g' {} +
+    echo "I: staged custom bootloaders (auto-boot timeout + Aegis branding)"
+  else
+    echo "W: live-build bootloader templates not at $BL_SRC; menu stays stock."
+  fi
 }
 
 build_one() {

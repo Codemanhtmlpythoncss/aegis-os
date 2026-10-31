@@ -37,3 +37,6 @@ config/package-lists/browser-firefox.list.chroot
 __pycache__/
 *.pyc
 .DS_Store
+
+# staged by build.sh from live-build defaults (regenerated each build)
+config/bootloaders/

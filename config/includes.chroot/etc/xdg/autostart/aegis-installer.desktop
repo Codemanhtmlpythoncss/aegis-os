@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Install Aegis OS
+Comment=Set up and install Aegis (close this window to use the live desktop instead)
+# Auto-launches the installer on the LIVE desktop so the ISO behaves like an
+# install disc. The `test -x` guard means it does nothing on an INSTALLED system
+# (aegis-apply removes the aegis-installer binary and this file after install).
+Exec=sh -c 'test -x /usr/local/bin/aegis-installer && exec aegis-installer'
+Icon=system-software-install
+Terminal=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=4

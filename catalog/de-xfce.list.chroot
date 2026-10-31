@@ -8,6 +8,7 @@ thunar-archive-plugin
 lightdm
 lightdm-gtk-greeter
 xfce4-screensaver
+lxpolkit
 network-manager-gnome
 pavucontrol
 pulseaudio
