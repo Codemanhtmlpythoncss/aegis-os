@@ -24,6 +24,23 @@ if [ -f /etc/os-release ]; then
 fi
 printf 'Aegis OS \\n \\l\n\n' > /etc/issue
 printf 'Aegis OS\n' > /etc/issue.net
+# lsb-release
+if [ -f /etc/lsb-release ]; then
+    sed -i 's/^DISTRIB_ID=.*/DISTRIB_ID=Aegis/' /etc/lsb-release || true
+    sed -i 's/^DISTRIB_DESCRIPTION=.*/DISTRIB_DESCRIPTION="Aegis OS"/' /etc/lsb-release || true
+else
+    printf 'DISTRIB_ID=Aegis\nDISTRIB_DESCRIPTION="Aegis OS"\n' > /etc/lsb-release
+fi
+# GRUB menu title on the INSTALLED system (grub-mkconfig reads this)
+if [ -f /etc/default/grub ]; then
+    if grep -q '^GRUB_DISTRIBUTOR=' /etc/default/grub; then
+        sed -i 's/^GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR="Aegis"/' /etc/default/grub
+    else
+        echo 'GRUB_DISTRIBUTOR="Aegis"' >> /etc/default/grub
+    fi
+fi
+# login message of the day
+printf '\nAegis OS — privacy-focused, amnesic, Tor/I2P. Stay sharp.\n\n' > /etc/motd
 
 # --- randomize identity each boot: blank machine-id so it regenerates ---
 : > /etc/machine-id

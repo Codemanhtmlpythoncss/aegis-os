@@ -87,7 +87,10 @@ build_one() {
   # console=ttyS0 makes systemd spawn a serial getty, which the CI boot smoke-test
   # watches for ("login:") to prove the image boots all the way. tty0 stays the
   # primary console so the desktop is unaffected.
-  local BOOTAPPEND="boot=live components console=ttyS0,115200 console=tty0 quiet splash \
+  # No 'quiet splash': a verbose boot means a VM never looks like a dead black
+  # screen — you see kernel/systemd progress. console=ttyS0 also feeds the CI
+  # boot smoke-test; tty0 stays primary for the desktop.
+  local BOOTAPPEND="boot=live components console=ttyS0,115200 console=tty0 \
 init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 page_poison=1 slab_nomerge \
 randomize_kstack_offset=on vsyscall=none debugfs=off \
 lockdown=confidentiality mce=0 loglevel=0 ipv6.disable=1 \

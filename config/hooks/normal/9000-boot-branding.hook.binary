@@ -14,4 +14,11 @@ for base in binary/boot/grub binary/boot/syslinux binary/isolinux binary/syslinu
             "$f" 2>/dev/null || true
     done
 done
-echo "I: [aegis] bootloader rebrand done"
+
+# Guarantee the menu auto-boots even when its graphics don't render in some VMs
+# (e.g. UTM showing a black screen) — a fixed timeout picks the default entry.
+[ -f binary/boot/grub/grub.cfg ] && sed -i 's/^set timeout=.*/set timeout=5/' binary/boot/grub/grub.cfg 2>/dev/null || true
+for ic in binary/isolinux/isolinux.cfg binary/isolinux/menu.cfg binary/syslinux/syslinux.cfg; do
+    [ -f "$ic" ] && sed -i -e 's/^timeout .*/timeout 50/' -e 's/^prompt .*/prompt 0/' "$ic" 2>/dev/null || true
+done
+echo "I: [aegis] bootloader rebrand + auto-boot timeout done"
