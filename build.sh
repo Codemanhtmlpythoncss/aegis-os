@@ -105,6 +105,8 @@ mitigations=auto,nosmt"
     --apt-recommends false \
     --apt-indices false \
     --memtest none \
+    --firmware-chroot false \
+    --firmware-binary false \
     --iso-application "Aegis OS" \
     --iso-volume "Aegis $arch" \
     "${QEMU_OPTS[@]}"
