@@ -1,7 +1,8 @@
 name: build-iso
 
-# Builds BOTH architectures on GitHub's Linux runners (you can't build an ISO on
-# macOS/Windows). amd64 builds natively; arm64 cross-builds via qemu-user-static.
+# Builds BOTH architectures natively — amd64 on the standard runner, arm64 on
+# GitHub's arm64 runner — so there's no slow/fragile qemu emulation. (ISOs can't
+# be built on macOS/Windows; CI or a Debian host does it.)
 # Push a tag like v1.0 to also publish the ISOs to a GitHub Release.
 
 on:
@@ -17,11 +18,13 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        arch: [ amd64, arm64 ]
+        include:
+          - { arch: amd64, runner: ubuntu-latest }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
     steps:
       - uses: actions/checkout@v4
 
@@ -35,8 +38,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            live-build debootstrap xorriso squashfs-tools mtools dosfstools \
-            qemu-user-static binfmt-support
+            live-build debootstrap xorriso squashfs-tools mtools dosfstools
 
       - name: Build Aegis (${{ matrix.arch }})
         run: sudo ./build.sh --arch ${{ matrix.arch }}

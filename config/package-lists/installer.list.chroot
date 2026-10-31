@@ -11,9 +11,14 @@ btrfs-progs
 cryptsetup
 cryptsetup-initramfs
 lvm2
-# bootloader install onto the target (both BIOS + UEFI)
-grub-efi-amd64-bin
+# bootloader install onto the target (architecture-specific — live-build conditionals)
+#if ARCHITECTURES amd64
 grub-pc-bin
+grub-efi-amd64-bin
+#endif
+#if ARCHITECTURES arm64
+grub-efi-arm64-bin
+#endif
 grub2-common
 os-prober
 efibootmgr
