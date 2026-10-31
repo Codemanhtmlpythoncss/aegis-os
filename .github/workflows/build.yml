@@ -86,9 +86,10 @@ jobs:
       - name: Boot smoke-test (${{ matrix.arch }})
         run: |
           set -eu
+          sudo chmod 0666 /dev/kvm 2>/dev/null || true   # runner has /dev/kvm but not group access
           ISO="$(ls iso/*.iso | head -n1)"
           echo "Booting $ISO"
-          if [ -e /dev/kvm ]; then ACCEL="-enable-kvm -cpu host"; else ACCEL="-cpu max"; fi
+          if [ -w /dev/kvm ]; then ACCEL="-enable-kvm -cpu host"; else echo "no KVM access -> TCG (slower)"; ACCEL="-cpu max"; fi
           if [ "${{ matrix.arch }}" = amd64 ]; then
             qemu-system-x86_64 $ACCEL -m 2048 -smp 2 -cdrom "$ISO" \
               -display none -serial file:serial.log -no-reboot &

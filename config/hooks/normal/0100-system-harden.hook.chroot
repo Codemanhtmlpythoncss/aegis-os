@@ -80,11 +80,12 @@ fi
 #     of baking the build host's devices in) ---
 if [ "$AEGIS_USBGUARD" = yes ]; then
     systemctl enable usbguard 2>/dev/null || true
-    # Ship an empty policy. USBGuard is enforcing, so the user generates a policy for
-    # THEIR hardware after install:  sudo usbguard generate-policy > /etc/usbguard/rules.conf
-    # (Baking the build host's device list in would be wrong and could lock out a keyboard.)
+    # IMPORTANT: ship an ALLOW-ALL policy for the live session. An empty policy means
+    # block-all (USBGuard default), which would lock out the keyboard/mouse (incl. a
+    # VM's virtual USB input). The user tightens it on their own hardware:
+    #   sudo usbguard generate-policy > /etc/usbguard/rules.conf && sudo systemctl restart usbguard
     mkdir -p /etc/usbguard
-    printf '# Run: sudo usbguard generate-policy > /etc/usbguard/rules.conf  (on your hardware)\n' \
+    printf '# Aegis live default: allow all USB so input always works.\n# Tighten on YOUR hardware: sudo usbguard generate-policy > /etc/usbguard/rules.conf\nallow\n' \
         > /etc/usbguard/rules.conf
 fi
 

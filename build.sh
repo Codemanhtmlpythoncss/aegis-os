@@ -87,10 +87,14 @@ build_one() {
   # console=ttyS0 makes systemd spawn a serial getty, which the CI boot smoke-test
   # watches for ("login:") to prove the image boots all the way. tty0 stays the
   # primary console so the desktop is unaffected.
+  # Serial console device differs by arch: 8250 (ttyS0) on x86, PL011 (ttyAMA0)
+  # on the arm64 'virt' machine. The CI boot smoke-test reads this serial line, so
+  # getting it right per-arch is what makes the arm64 boot test actually work.
+  local SERCON="ttyS0,115200"
+  [ "$arch" = arm64 ] && SERCON="ttyAMA0,115200"
   # No 'quiet splash': a verbose boot means a VM never looks like a dead black
-  # screen — you see kernel/systemd progress. console=ttyS0 also feeds the CI
-  # boot smoke-test; tty0 stays primary for the desktop.
-  local BOOTAPPEND="boot=live components console=ttyS0,115200 console=tty0 \
+  # screen — you see kernel/systemd progress. tty0 stays primary for the desktop.
+  local BOOTAPPEND="boot=live components console=$SERCON console=tty0 \
 init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 page_poison=1 slab_nomerge \
 randomize_kstack_offset=on vsyscall=none debugfs=off \
 lockdown=confidentiality mce=0 loglevel=0 ipv6.disable=1 \

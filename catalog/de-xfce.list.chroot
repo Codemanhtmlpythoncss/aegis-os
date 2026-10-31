@@ -9,7 +9,6 @@ lightdm
 lightdm-gtk-greeter
 xfce4-screensaver
 network-manager-gnome
-blueman
 pavucontrol
 pulseaudio
 xserver-xorg
