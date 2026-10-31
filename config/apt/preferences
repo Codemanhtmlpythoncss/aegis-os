@@ -1,0 +1,7 @@
+# The b43 Broadcom firmware "installer" packages download firmware from the
+# internet in their postinst script, which fails in live-build's offline chroot
+# and breaks the whole build. live-build auto-pulls every firmware-* package, so
+# forbid just these two. All other wifi/GPU firmware is still included.
+Package: firmware-b43-installer firmware-b43legacy-installer b43-fwcutter
+Pin: release *
+Pin-Priority: -1
