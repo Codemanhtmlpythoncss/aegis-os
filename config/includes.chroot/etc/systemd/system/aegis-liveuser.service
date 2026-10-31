@@ -1,0 +1,15 @@
+# Aegis: on a LIVE boot, give the live user a known admin password ("live") so
+# sudo / pkexec (Install Aegis, Aegis Control) / a manual screen-lock all work.
+# Skipped on installed systems (no /run/live/medium) — those use the installer's user.
+[Unit]
+Description=Aegis set live user password
+After=live-config.service
+ConditionPathExists=/run/live/medium
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'u=user; id "$u" >/dev/null 2>&1 && { echo "$u:live" | chpasswd; usermod -aG sudo,autologin "$u" 2>/dev/null; echo "aegis: set password for $u"; }; true'
+
+[Install]
+WantedBy=multi-user.target

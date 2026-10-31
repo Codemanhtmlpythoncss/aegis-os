@@ -64,6 +64,7 @@ echo "$AEGIS_DEFAULT_NETMODE" > /etc/aegis/netmode
 # --- enable Aegis services + anonymity daemons ---
 systemctl enable aegis-netmode.service 2>/dev/null || true
 systemctl enable aegis-hostname.service 2>/dev/null || true
+systemctl enable aegis-liveuser.service 2>/dev/null || true
 # Disable the Ctrl+Alt+Del reboot combo (avoids accidental/forced reboots).
 systemctl mask ctrl-alt-del.target 2>/dev/null || true
 systemctl enable tor@default.service 2>/dev/null || systemctl enable tor 2>/dev/null || true

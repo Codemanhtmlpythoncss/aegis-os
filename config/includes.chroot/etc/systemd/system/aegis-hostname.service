@@ -1,10 +1,10 @@
 # Randomize the hostname before the network comes up.
 [Unit]
 Description=Aegis random hostname
-DefaultDependencies=no
-After=local-fs.target
-Before=network-pre.target NetworkManager.service systemd-hostnamed.service
-Wants=network-pre.target
+# Run AFTER live-config (which sets the hostname to "debian"), so our random name
+# is the one that sticks, but before the display manager starts the session.
+After=live-config.service
+Before=lightdm.service
 
 [Service]
 Type=oneshot
