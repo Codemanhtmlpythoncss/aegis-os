@@ -14,4 +14,4 @@ obfs4proxy
 i2pd
 
 # DNS resolution over the anonymity layer
-dnsutils
+bind9-dnsutils

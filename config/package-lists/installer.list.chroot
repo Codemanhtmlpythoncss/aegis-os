@@ -23,4 +23,5 @@ grub2-common
 os-prober
 efibootmgr
 # polkit so the desktop launcher can elevate
-policykit-1
+polkitd
+pkexec
