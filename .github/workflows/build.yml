@@ -1,11 +1,10 @@
 name: build-iso
 
 # Builds BOTH architectures natively (amd64 on the standard runner, arm64 on
-# GitHub's arm64 runner). The build runs inside a Debian trixie container so we
-# use Debian's own live-build — Ubuntu's live-build is an old fork that rejects
-# the options an Aegis (Debian) image needs. Privileged container = live-build
-# can do its chroot bind-mounts. ISOs can't be built on macOS/Windows.
-# Push a tag like v1.0 to also publish the ISOs to a GitHub Release.
+# GitHub's arm64 runner), inside a Debian trixie container so we use Debian's own
+# live-build. A SEPARATE release job (on the host runner, where `gh` exists)
+# attaches the ISOs to a GitHub Release when you push a tag like v1.0.
+# ISOs can't be built on macOS/Windows.
 
 on:
   push:
@@ -61,11 +60,26 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-      - name: Publish to Release (tags only)
-        if: startsWith(github.ref, 'refs/tags/')
+  # Runs on the HOST runner (gh CLI is present here, unlike the Debian container).
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download built ISOs
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish ISOs to the Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" --title "Aegis ${GITHUB_REF_NAME}" \
-            --notes "Automated Aegis build (${GITHUB_REF_NAME})." 2>/dev/null || true
-          gh release upload "${GITHUB_REF_NAME}" out/* --clobber
+          ls -R dist
+          FILES="$(find dist -type f \( -name '*.iso' -o -name '*.sha256' \))"
+          echo "Attaching:"; echo "$FILES"
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "Aegis $GITHUB_REF_NAME" \
+            --notes "Automated Aegis build ($GITHUB_REF_NAME). ISOs for amd64 and arm64 are attached below." \
+            || true
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" $FILES --clobber
