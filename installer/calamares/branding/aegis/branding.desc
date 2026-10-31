@@ -18,9 +18,9 @@ strings:
   releaseNotesUrl:      "https://example.invalid/aegis/notes"
 
 images:
-  productLogo:  "logo.png"
-  productIcon:  "logo.png"
-  productWelcome: "welcome.png"
+  productLogo:  "logo.svg"
+  productIcon:  "logo.svg"
+  productWelcome: "logo.svg"
 
 slideshow: "show.qml"
 

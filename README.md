@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.svg" width="128" height="128" alt="Aegis OS logo">
+</p>
+
 # Aegis OS
 
 A Debian-based, privacy-focused live OS that borrows from **Tails** (amnesic, forced-
