@@ -1,8 +1,10 @@
 name: build-iso
 
-# Builds BOTH architectures natively — amd64 on the standard runner, arm64 on
-# GitHub's arm64 runner — so there's no slow/fragile qemu emulation. (ISOs can't
-# be built on macOS/Windows; CI or a Debian host does it.)
+# Builds BOTH architectures natively (amd64 on the standard runner, arm64 on
+# GitHub's arm64 runner). The build runs inside a Debian trixie container so we
+# use Debian's own live-build — Ubuntu's live-build is an old fork that rejects
+# the options an Aegis (Debian) image needs. Privileged container = live-build
+# can do its chroot bind-mounts. ISOs can't be built on macOS/Windows.
 # Push a tag like v1.0 to also publish the ISOs to a GitHub Release.
 
 on:
@@ -19,6 +21,9 @@ permissions:
 jobs:
   build:
     runs-on: ${{ matrix.runner }}
+    container:
+      image: debian:trixie
+      options: --privileged
     strategy:
       fail-fast: false
       matrix:
@@ -26,22 +31,21 @@ jobs:
           - { arch: amd64, runner: ubuntu-latest }
           - { arch: arm64, runner: ubuntu-24.04-arm }
     steps:
+      - name: Install build dependencies (Debian live-build)
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            live-build debootstrap xorriso squashfs-tools mtools dosfstools \
+            git ca-certificates
+          git config --global --add safe.directory '*'
+
       - uses: actions/checkout@v4
 
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet \
-                      /opt/hostedtoolcache/CodeQL /usr/local/.ghcup || true
-          df -h /
-
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            live-build debootstrap xorriso squashfs-tools mtools dosfstools
+      - name: Show disk space
+        run: df -h . || true
 
       - name: Build Aegis (${{ matrix.arch }})
-        run: sudo ./build.sh --arch ${{ matrix.arch }}
+        run: ./build.sh --arch ${{ matrix.arch }}   # already root in the container
 
       - name: Collect artifacts
         run: |
