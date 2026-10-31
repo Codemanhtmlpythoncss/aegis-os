@@ -10,6 +10,10 @@
 #   sudo ./build.sh --arch amd64      # normal PCs (BIOS + UEFI)
 #   sudo ./build.sh --arch arm64      # UEFI arm64 (QEMU virt, Apple-Silicon VM, …)
 #   sudo ./build.sh --arch both       # build both, one after the other
+#
+#   --edition live       (default) amnesic live USB; wipes RAM & powers off if the USB is pulled (Tails-style)
+#   --edition installer  boots straight into the installer (install to an SSD)
+#   --edition both       build both editions
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -18,15 +22,17 @@ cd "$HERE"
 . "$HERE/profiles/defaults.conf"
 HOST_ARCH="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
 ARCH="$HOST_ARCH"
+EDITION="live"
 SUITE="${AEGIS_SUITE:-trixie}"
 MIRROR="http://deb.debian.org/debian/"
 
 usage() { grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 while [ $# -gt 0 ]; do
   case "$1" in
-    --arch)  ARCH="$2"; shift 2 ;;
-    --suite) SUITE="$2"; shift 2 ;;
-    --mirror) MIRROR="$2"; shift 2 ;;
+    --arch)    ARCH="$2"; shift 2 ;;
+    --edition) EDITION="$2"; shift 2 ;;
+    --suite)   SUITE="$2"; shift 2 ;;
+    --mirror)  MIRROR="$2"; shift 2 ;;
     -h|--help) usage 0 ;;
     *) echo "unknown arg: $1" >&2; usage 1 ;;
   esac
@@ -35,6 +41,11 @@ case "$ARCH" in
   amd64|arm64) ARCHES=("$ARCH") ;;
   both)        ARCHES=(amd64 arm64) ;;
   *) echo "arch must be amd64, arm64 or both" >&2; exit 1 ;;
+esac
+case "$EDITION" in
+  live|installer) EDITIONS=("$EDITION") ;;
+  both)           EDITIONS=(live installer) ;;
+  *) echo "edition must be live, installer or both" >&2; exit 1 ;;
 esac
 [ "$(id -u)" = 0 ] || { echo "must run as root (live-build uses chroots)." >&2; exit 1; }
 
@@ -102,8 +113,8 @@ stage_payload() {
 }
 
 build_one() {
-  local arch="$1"
-  echo "==> Building Aegis  arch=$arch  suite=$SUITE"
+  local arch="$1" edition="${2:-live}"
+  echo "==> Building Aegis  edition=$edition  arch=$arch  suite=$SUITE"
 
   local BOOTLOADERS="grub-efi"
   local -a QEMU_OPTS=()
@@ -154,7 +165,7 @@ mitigations=auto,nosmt"
     --firmware-chroot false \
     --firmware-binary false \
     --iso-application "Aegis OS" \
-    --iso-volume "Aegis $arch" \
+    --iso-volume "Aegis $edition $arch" \
     "${QEMU_OPTS[@]}"
 
   echo "==> lb build ($arch) — this takes a while"
@@ -164,16 +175,21 @@ mitigations=auto,nosmt"
   STAMP="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y%m%d 2>/dev/null || date +%Y%m%d)"
   SRC="$(ls -1 live-image-*.hybrid.iso 2>/dev/null | head -n1 || true)"
   [ -n "$SRC" ] || { echo "build produced no ISO for $arch — check the log." >&2; return 1; }
-  OUT="aegis-${arch}-${STAMP}.iso"
+  OUT="aegis-${edition}-${arch}-${STAMP}.iso"
   mv "$SRC" "$OUT"
   sha256sum "$OUT" > "$OUT.sha256"
   echo "==> Built: $OUT  (+ .sha256)"
 }
 
 stage_payload
-for a in "${ARCHES[@]}"; do build_one "$a"; done
+for edition in "${EDITIONS[@]}"; do
+  # Write this batch's edition into build.env (the 0600 hook reads it).
+  sed -i '/^AEGIS_EDITION=/d' config/includes.chroot/etc/aegis/build.env 2>/dev/null || true
+  echo "AEGIS_EDITION=\"$edition\"" >> config/includes.chroot/etc/aegis/build.env
+  for a in "${ARCHES[@]}"; do build_one "$a" "$edition"; done
+done
 
 echo
 echo "==> Done. ISOs:"
 ls -1 aegis-*-*.iso 2>/dev/null || true
-echo "    Test with QEMU (docs/BUILD.md), then dd to USB."
+echo "    Test with QEMU (docs/BUILD.md), then dd to USB (scripts/write-usb.sh)."

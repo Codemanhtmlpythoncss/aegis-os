@@ -1,0 +1,15 @@
+# Tails-style wipe-on-removal: watch the live USB; if pulled, wipe RAM & power off.
+# Enabled only on the LIVE edition (see hook 0600-edition).
+[Unit]
+Description=Aegis live-medium removal watchdog (wipe on pull-out)
+After=local-fs.target
+ConditionPathIsDirectory=/run/live/medium
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/aegis-media-watchdog
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

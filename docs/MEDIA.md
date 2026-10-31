@@ -1,8 +1,19 @@
 # Aegis on USB, DVD, and permanent media (SSD/HDD)
 
-**One image does all of it.** `aegis-<arch>.iso` is a *hybrid* ISO — it boots from a
-DVD **and** from a USB stick, and it carries the installer that puts Aegis permanently
-onto an SSD. You don't need separate downloads.
+Aegis ships in **two editions**, per architecture:
+
+| ISO | What it's for |
+|-----|---------------|
+| **`aegis-live-<arch>.iso`** | Amnesic **live USB** (Tails-style). Boots to the desktop, leaves nothing on the host, and **wipes RAM & powers off the instant you pull the stick**. (You can still install from it via the *Install Aegis* icon.) |
+| **`aegis-installer-<arch>.iso`** | Boots **straight into the installer** — like a normal install disc — to put Aegis permanently (encrypted) onto an **SSD**. |
+
+Both are *hybrid* ISOs (boot from USB or DVD). Pick the one that matches what you want
+to do; the sections below apply to either.
+
+> **Wipe-on-removal (live edition):** while running the live USB, a watchdog guards the
+> stick. Pull it out and Aegis immediately wipes free RAM (sdmem + the kernel's
+> `init_on_free`) and powers off. Best-effort, like Tails — a full-RAM kexec wiper is on
+> the roadmap (`docs/SECURITY.md`). Only triggers for *removable* media, never a fixed disk.
 
 ## 1. USB stick — run Aegis live (amnesic)
 

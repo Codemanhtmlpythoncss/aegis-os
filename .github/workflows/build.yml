@@ -1,10 +1,10 @@
 name: build-iso
 
-# Builds BOTH architectures natively (amd64 on the standard runner, arm64 on
-# GitHub's arm64 runner), inside a Debian trixie container so we use Debian's own
-# live-build. A SEPARATE release job (on the host runner, where `gh` exists)
-# attaches the ISOs to a GitHub Release when you push a tag like v1.0.
-# ISOs can't be built on macOS/Windows.
+# Builds every edition x arch: {live, installer} x {amd64, arm64} = 4 ISOs.
+#   live      = amnesic USB; wipes RAM & powers off if the stick is pulled (Tails-style)
+#   installer = boots straight into the installer (install to an SSD)
+# Build runs in a Debian trixie container (Debian's own live-build). A separate
+# host-runner job attaches the ISOs to a Release on tags (v*).
 
 on:
   push:
@@ -27,8 +27,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { arch: amd64, runner: ubuntu-latest }
-          - { arch: arm64, runner: ubuntu-24.04-arm }
+          - { edition: live,      arch: amd64, runner: ubuntu-latest }
+          - { edition: live,      arch: arm64, runner: ubuntu-24.04-arm }
+          - { edition: installer, arch: amd64, runner: ubuntu-latest }
+          - { edition: installer, arch: arm64, runner: ubuntu-24.04-arm }
     steps:
       - name: Install build dependencies (Debian live-build)
         run: |
@@ -43,8 +45,8 @@ jobs:
       - name: Show disk space
         run: df -h . || true
 
-      - name: Build Aegis (${{ matrix.arch }})
-        run: ./build.sh --arch ${{ matrix.arch }}   # already root in the container
+      - name: Build Aegis (${{ matrix.edition }} / ${{ matrix.arch }})
+        run: ./build.sh --arch ${{ matrix.arch }} --edition ${{ matrix.edition }}
 
       - name: Collect artifacts
         run: |
@@ -55,13 +57,11 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: aegis-${{ matrix.arch }}
+          name: aegis-${{ matrix.edition }}-${{ matrix.arch }}
           path: out/*
           if-no-files-found: error
           compression-level: 0
 
-  # Boot each built ISO headless in QEMU and confirm it reaches a login prompt on
-  # the serial console — i.e. it actually boots, not just assembles.
   boot-test:
     needs: build
     runs-on: ${{ matrix.runner }}
@@ -69,8 +69,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { arch: amd64, runner: ubuntu-latest }
-          - { arch: arm64, runner: ubuntu-24.04-arm }
+          - { edition: live,      arch: amd64, runner: ubuntu-latest }
+          - { edition: live,      arch: arm64, runner: ubuntu-24.04-arm }
+          - { edition: installer, arch: amd64, runner: ubuntu-latest }
+          - { edition: installer, arch: arm64, runner: ubuntu-24.04-arm }
     steps:
       - name: Install QEMU
         run: |
@@ -80,13 +82,13 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: aegis-${{ matrix.arch }}
+          name: aegis-${{ matrix.edition }}-${{ matrix.arch }}
           path: iso
 
-      - name: Boot smoke-test (${{ matrix.arch }})
+      - name: Boot smoke-test (${{ matrix.edition }} / ${{ matrix.arch }})
         run: |
           set -eu
-          sudo chmod 0666 /dev/kvm 2>/dev/null || true   # runner has /dev/kvm but not group access
+          sudo chmod 0666 /dev/kvm 2>/dev/null || true
           ISO="$(ls iso/*.iso | head -n1)"
           echo "Booting $ISO"
           if [ -w /dev/kvm ]; then ACCEL="-enable-kvm -cpu host"; else echo "no KVM access -> TCG (slower)"; ACCEL="-cpu max"; fi
@@ -109,15 +111,13 @@ jobs:
           done
           kill "$QPID" 2>/dev/null || true
           echo "---- serial.log tail ----"; tail -n 50 serial.log 2>/dev/null || true
-          # Also fail if a critical service failed to start (catches boot regressions
-          # like the firewall job-cascade that a 'reached login' check alone misses).
           if [ "$OK" = 1 ] && grep -qE "Failed to start (NetworkManager|aegis-netmode|tor@default|systemd-user-sessions|i2pd)" serial.log 2>/dev/null; then
             echo "CRITICAL SERVICE(S) FAILED:"; grep -E "Failed to start (NetworkManager|aegis-netmode|tor@default|systemd-user-sessions|i2pd)" serial.log | sort -u
             OK=0
           fi
           if [ "$OK" = 1 ]; then echo "BOOT SMOKE-TEST PASSED"; else echo "BOOT SMOKE-TEST FAILED"; exit 1; fi
 
-  # Runs on the HOST runner (gh CLI is present here, unlike the Debian container).
+  # Runs on the HOST runner (gh CLI present here, unlike the Debian container).
   release:
     needs: [ build, boot-test ]
     if: startsWith(github.ref, 'refs/tags/')
@@ -137,6 +137,6 @@ jobs:
           echo "Attaching:"; echo "$FILES"
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --title "Aegis $GITHUB_REF_NAME" \
-            --notes "Automated Aegis build ($GITHUB_REF_NAME). ISOs for amd64 and arm64 are attached below." \
+            --notes "Automated Aegis build ($GITHUB_REF_NAME). Editions: live (amnesic, wipe-on-removal) and installer; for amd64 and arm64." \
             || true
           gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" $FILES --clobber

@@ -1,0 +1,24 @@
+#!/bin/sh
+# Aegis chroot hook: configure the ISO EDITION.
+#   installer -> the installer auto-launches on boot (install-disc behaviour),
+#                no wipe-on-removal.
+#   live      -> amnesic live USB; installer is available via its icon but does
+#                NOT auto-launch; wipe-on-removal watchdog is ENABLED (Tails-style).
+set -e
+[ -r /etc/aegis/build.env ] && . /etc/aegis/build.env || true
+: "${AEGIS_EDITION:=live}"
+echo "I: [aegis] 0600 edition=$AEGIS_EDITION"
+
+if [ "$AEGIS_EDITION" = installer ]; then
+    # Auto-launch installer; no media wipe.
+    systemctl disable aegis-media-watchdog.service 2>/dev/null || true
+    # keep /etc/xdg/autostart/aegis-installer.desktop (auto-launch)
+else
+    # Live: do not auto-launch the installer (keep its desktop icon though).
+    rm -f /etc/xdg/autostart/aegis-installer.desktop
+    # Tails-style: pull the USB -> wipe RAM + power off.
+    systemctl enable aegis-media-watchdog.service 2>/dev/null || true
+fi
+
+chmod 0755 /usr/local/bin/aegis-* 2>/dev/null || true
+echo "I: [aegis] 0600 done"
