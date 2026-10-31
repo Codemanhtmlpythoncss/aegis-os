@@ -30,6 +30,16 @@ pref("signon.rememberSignons", false);
 pref("browser.formfill.enable", false);
 pref("places.history.enabled", false);               // amnesic by default
 pref("network.trr.mode", 5);                          // DNS via system -> Tor, not DoH
+pref("javascript.options.baselinejit", false);       // shrink JS JIT attack surface
+pref("javascript.options.ion", false);
+pref("javascript.options.asmjs", false);
+pref("javascript.options.wasm", false);
+pref("dom.serviceWorkers.enabled", false);
+pref("dom.event.clipboardevents.enabled", false);
+pref("media.navigator.enabled", false);              // no device enumeration fingerprint
+pref("dom.webaudio.enabled", false);
+pref("browser.cache.disk.enable", false);            // no on-disk browser cache
+pref("browser.privatebrowsing.autostart", true);     // always private mode
 JS
 
 echo "I: [aegis] 0200 done"

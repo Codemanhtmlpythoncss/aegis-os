@@ -85,9 +85,10 @@ build_one() {
 
   # Hardened + quiet kernel command line for the live boot entry.
   local BOOTAPPEND="boot=live components quiet splash \
-init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 slab_nomerge \
+init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 page_poison=1 slab_nomerge \
 randomize_kstack_offset=on vsyscall=none debugfs=off \
 lockdown=confidentiality mce=0 loglevel=0 ipv6.disable=1 \
+intel_iommu=on amd_iommu=on efi=disable_early_pci_dma \
 mitigations=auto,nosmt"
 
   echo "==> lb config ($arch)"

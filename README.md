@@ -17,6 +17,7 @@ full-disk encryption.
 - [`docs/DESIGN.md`](docs/DESIGN.md) — architecture + **honest limits** (incl. why "Tor was
   cracked by the CIA" isn't accurate, and why hardened Firefox ≠ Tor Browser for anonymity).
 - [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) — what this does and does **not** protect you from.
+- [`docs/SECURITY.md`](docs/SECURITY.md) — the 50-item hardening catalog with honest status tags (implemented / installer / roadmap).
 
 ## Quick start
 
