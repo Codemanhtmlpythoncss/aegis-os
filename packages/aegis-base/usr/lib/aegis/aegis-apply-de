@@ -1,0 +1,19 @@
+#!/bin/sh
+# aegis-apply-de <session-id> — set the live autologin session and restart lightdm
+# so the chosen desktop comes up. Root only (invoked via pkexec by aegis-switch-de).
+set -eu
+
+SESS="${1:?usage: aegis-apply-de <session-id>}"
+[ -f "/usr/share/xsessions/${SESS}.desktop" ] || { echo "unknown session: $SESS" >&2; exit 2; }
+
+d=/etc/lightdm/lightdm.conf.d
+f="$d/10-aegis-autologin.conf"
+mkdir -p "$d"
+if [ -f "$f" ] && grep -q '^autologin-session=' "$f"; then
+    sed -i "s/^autologin-session=.*/autologin-session=$SESS/" "$f"
+else
+    printf '[Seat:*]\nautologin-user=user\nautologin-user-timeout=0\nautologin-session=%s\n' "$SESS" > "$f"
+fi
+
+# Restart the display manager into the new session.
+systemctl restart lightdm

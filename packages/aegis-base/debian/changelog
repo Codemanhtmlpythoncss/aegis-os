@@ -7,5 +7,8 @@ aegis-base (1.2.0) trixie; urgency=medium
   * fastfetch: ship an Aegis ASCII logo + config and show it in interactive
     terminals.
   * Desktop: ship the Aegis wallpaper and apply it on login.
+  * Richer fastfetch (live network-mode + Tor status, palette bar).
+  * Live "Switch Desktop" tool (aegis-switch-de) to change DE on the running
+    live session.
 
  -- Aegis OS <aegis@aegis-os.localdomain>  Sat, 01 Nov 2026 09:40:00 +0000

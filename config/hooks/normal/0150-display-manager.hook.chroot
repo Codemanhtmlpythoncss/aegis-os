@@ -1,0 +1,20 @@
+#!/bin/sh
+# Aegis chroot hook: with every DE installed, several display managers come along
+# (KDE pulls sddm, GNOME pulls gdm3). Force lightdm as THE display manager so the
+# Aegis autologin config works and the greeter can offer every installed session
+# (XFCE / Plasma / GNOME / i3) for live DE switching.
+set -e
+echo "I: [aegis] 0150 force lightdm as the display manager"
+
+if [ -x /usr/sbin/lightdm ] || [ -x /usr/bin/lightdm ]; then
+    LDM="$(command -v lightdm || echo /usr/sbin/lightdm)"
+    echo "$LDM" > /etc/X11/default-display-manager
+    echo "lightdm shared/default-x-display-manager select lightdm" | debconf-set-selections 2>/dev/null || true
+    # Only lightdm runs; the others stay installed but inactive.
+    systemctl disable gdm3 2>/dev/null || true
+    systemctl disable sddm 2>/dev/null || true
+    systemctl enable lightdm 2>/dev/null || true
+    echo "I: [aegis] display manager = lightdm (gdm3/sddm disabled)"
+else
+    echo "W: [aegis] lightdm not installed; leaving display manager as-is"
+fi

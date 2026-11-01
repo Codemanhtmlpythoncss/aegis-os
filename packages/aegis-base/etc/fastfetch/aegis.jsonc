@@ -1,4 +1,4 @@
-// Aegis OS fastfetch config. Run with: fastfetch --config /etc/fastfetch/aegis.jsonc
+// Aegis OS fastfetch. Default config (also shipped to ~/.config/fastfetch).
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
   "logo": {
@@ -7,21 +7,30 @@
     "color": { "1": "38;2;45;212;191", "2": "38;2;233;238;245" },
     "padding": { "top": 1, "right": 3 }
   },
-  "display": { "separator": "  " },
+  "display": { "separator": "  ", "color": { "keys": "38;2;45;212;191" } },
   "modules": [
     "break",
-    { "type": "title", "color": { "user": "38;2;45;212;191", "host": "38;2;45;212;191" } },
-    "separator",
-    { "type": "os",       "key": "  OS      ", "keyColor": "38;2;45;212;191" },
-    { "type": "kernel",   "key": "  Kernel  ", "keyColor": "38;2;45;212;191" },
-    { "type": "host",     "key": "  Host    ", "keyColor": "38;2;45;212;191" },
-    { "type": "uptime",   "key": "  Uptime  ", "keyColor": "38;2;45;212;191" },
-    { "type": "packages", "key": "  Packages", "keyColor": "38;2;45;212;191" },
-    { "type": "shell",    "key": "  Shell   ", "keyColor": "38;2;45;212;191" },
-    { "type": "de",       "key": "  Desktop ", "keyColor": "38;2;45;212;191" },
-    { "type": "memory",   "key": "  Memory  ", "keyColor": "38;2;45;212;191" },
+    { "type": "custom", "format": "\u001b[1;38;2;45;212;191m        A E G I S   O S\u001b[0m" },
+    { "type": "custom", "format": "\u001b[38;2;120;140;160m     privacy · anonymity · amnesia\u001b[0m" },
     "break",
-    { "type": "custom", "format": "  \u001b[38;2;45;212;191m●\u001b[0m amnesic · Tor / I2P · identity randomised each boot" },
+    { "type": "title", "key": " ", "format": "{user-name}\u001b[38;2;120;140;160m@\u001b[0m{host-name}" },
+    { "type": "separator", "string": "────────────────────────────" },
+    { "type": "os",        "key": "  OS       " },
+    { "type": "kernel",    "key": "  Kernel   " },
+    { "type": "host",      "key": "  Host     " },
+    { "type": "uptime",    "key": "  Uptime   " },
+    { "type": "packages",  "key": "  Packages " },
+    { "type": "shell",     "key": "  Shell    " },
+    { "type": "de",        "key": "  Desktop  " },
+    { "type": "terminal",  "key": "  Terminal " },
+    { "type": "cpu",       "key": "  CPU      " },
+    { "type": "memory",    "key": "  Memory   " },
+    { "type": "disk",      "key": "  Disk     ", "folders": "/" },
+    { "type": "separator", "string": "────────────────────────────" },
+    { "type": "command",   "key": "  Network  ", "text": "m=$(cat /etc/aegis/netmode 2>/dev/null || echo tor); case $m in tor) echo 'Tor (fail-closed)';; i2p) echo 'I2P (fail-closed)';; both) echo 'Tor + I2P';; vpn) echo 'VPN kill-switch';; *) echo \"$m\";; esac" },
+    { "type": "command",   "key": "  Tor      ", "text": "systemctl is-active tor@default.service 2>/dev/null | sed 's/active/connected/; s/inactive/stopped/; s/failed/not connected/'" },
+    "break",
+    { "type": "colors", "symbol": "circle" },
     "break"
   ]
 }

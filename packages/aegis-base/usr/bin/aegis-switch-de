@@ -1,0 +1,27 @@
+#!/bin/sh
+# aegis-switch-de — switch the live desktop environment. Shows a zenity menu of
+# the actually-installed X sessions; applies the choice (updates lightdm autologin
+# + restarts the session) via the privileged helper. Usage: aegis-switch-de [id]
+set -eu
+
+arg="${1:-}"
+if [ -z "$arg" ]; then
+    if ! command -v zenity >/dev/null 2>&1; then
+        echo "Installed sessions:"; ls /usr/share/xsessions/ 2>/dev/null | sed 's/\.desktop$//'
+        echo "Run: aegis-switch-de <id>"; exit 0
+    fi
+    set --
+    for f in /usr/share/xsessions/*.desktop; do
+        [ -f "$f" ] || continue
+        id=$(basename "$f" .desktop)
+        name=$(sed -n 's/^Name=//p' "$f" | head -1)
+        set -- "$@" "$id" "${name:-$id}"
+    done
+    arg=$(zenity --list --title="Switch Desktop" \
+          --text="Choose a desktop environment.\nYou will be logged out of the current one." \
+          --column=id --column=Desktop --hide-column=1 --print-column=1 \
+          --width=360 --height=300 "$@" 2>/dev/null) || exit 0
+fi
+
+[ -n "$arg" ] || exit 0
+pkexec /usr/lib/aegis/aegis-apply-de "$arg"

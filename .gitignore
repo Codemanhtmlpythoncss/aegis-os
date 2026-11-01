@@ -38,8 +38,8 @@ config/packages.chroot/
 config/includes.chroot/etc/aegis/build.env
 config/includes.chroot/etc/calamares/
 config/includes.chroot/usr/share/aegis/
-config/package-lists/de-xfce.list.chroot
-config/package-lists/browser-firefox.list.chroot
+config/package-lists/de-*.list.chroot
+config/package-lists/browser-*.list.chroot
 
 # --- Debian package build artifacts (built in CI, never committed) ---
 packages/*.deb

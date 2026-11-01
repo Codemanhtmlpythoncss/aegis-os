@@ -75,8 +75,13 @@ stage_payload() {
   cp -a installer/calamares/branding       config/includes.chroot/etc/calamares/
   cp -a installer/calamares/modules/.       config/includes.chroot/etc/calamares/modules/
 
-  cp -f catalog/de-xfce.list.chroot         config/package-lists/
+  # Install EVERY desktop environment and browser by default (the user picks at
+  # runtime). de-* are full package lists; librewolf/mullvad are pulled by the
+  # 0250 browsers hook (they need their own repos). lightdm is forced as the one
+  # display manager by the 0150 hook so KDE's sddm / GNOME's gdm3 don't take over.
+  cp -f catalog/de-*.list.chroot            config/package-lists/
   cp -f catalog/browser-firefox.list.chroot config/package-lists/
+  cp -f catalog/browser-torbrowser.list.chroot config/package-lists/
 
   # --- bootloader: AUTO-BOOT (finite timeout) + brand the menu as Aegis ---
   # live-build generates the GRUB/isolinux config late (after binary hooks), so a

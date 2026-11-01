@@ -1,0 +1,44 @@
+#!/bin/sh
+# Aegis chroot hook: install ALL the privacy browsers into the live image by
+# default — Firefox ESR, Tor Browser (launcher), Mullvad Browser and LibreWolf —
+# so the user can pick any at runtime. Mullvad and LibreWolf need their own APT
+# repos; best-effort per browser (some aren't published for every arch).
+set -e
+echo "I: [aegis] 0250 install all browsers"
+
+export DEBIAN_FRONTEND=noninteractive
+ARCH="$(dpkg --print-architecture)"
+CODENAME="$(. /etc/os-release; echo "${VERSION_CODENAME:-trixie}")"
+try_install() { apt-get install -y --no-install-recommends "$@" || echo "W: [aegis] could not install: $*"; }
+
+install -d -m0755 /etc/apt/keyrings
+
+# --- Mullvad Browser repo ---
+if curl -fsSL https://repository.mullvad.net/deb/mullvad-keyring.asc \
+        -o /etc/apt/keyrings/mullvad-keyring.asc 2>/dev/null; then
+    echo "deb [signed-by=/etc/apt/keyrings/mullvad-keyring.asc arch=${ARCH}] https://repository.mullvad.net/deb/stable ${CODENAME} main" \
+        > /etc/apt/sources.list.d/mullvad.list
+fi
+
+# --- LibreWolf repo ---
+if curl -fsSL https://deb.librewolf.net/keyring.gpg \
+        -o /etc/apt/keyrings/librewolf.gpg 2>/dev/null; then
+    cat > /etc/apt/sources.list.d/librewolf.sources <<EOF
+Types: deb
+URIs: https://deb.librewolf.net
+Suites: ${CODENAME}
+Components: main
+Architectures: ${ARCH}
+Signed-By: /etc/apt/keyrings/librewolf.gpg
+EOF
+fi
+
+apt-get update || true
+
+# Firefox ESR + uBlock are in the base list already; make sure, then the rest.
+try_install firefox-esr webext-ublock-origin-firefox
+try_install torbrowser-launcher
+try_install mullvad-browser
+try_install librewolf
+
+echo "I: [aegis] 0250 browsers done ($(dpkg -l 'firefox-esr' 'torbrowser-launcher' 'mullvad-browser' 'librewolf' 2>/dev/null | grep -c '^ii') of 4 installed)"

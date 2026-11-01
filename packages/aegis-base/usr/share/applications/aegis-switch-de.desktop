@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Switch Desktop
+GenericName=Desktop environment switcher
+Comment=Switch between the installed desktops (XFCE, KDE, GNOME, i3)
+Exec=aegis-switch-de
+Icon=preferences-desktop-display
+Terminal=false
+Categories=System;Settings;DesktopSettings;
+Keywords=aegis;desktop;environment;session;xfce;kde;gnome;i3;switch;
+StartupNotify=true
