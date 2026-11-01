@@ -1,0 +1,56 @@
+#!/bin/sh
+# aegis-tor-port — choose which outbound port(s) Tor is allowed to use to reach
+# the network, the same way you pick a VPN endpoint port. On networks that only
+# permit web ports, restricting Tor to 443 (or 80,443) gets it through. Root only.
+#   aegis-tor-port set <port|list>   e.g.  443   or   80,443
+#   aegis-tor-port any               no restriction (Tor uses any relay port)
+#   aegis-tor-port show              prints the current setting
+# Implemented with Tor's ReachableAddresses; written to a torrc drop-in and
+# applied by reconnecting Tor.
+set -eu
+[ "$(id -u)" = 0 ] || { echo "aegis-tor-port: must run as root" >&2; exit 1; }
+
+DROPIN=/etc/tor/torrc.d/20-aegis-ports.conf
+mkdir -p /etc/tor/torrc.d
+
+reload_tor() {
+    systemctl reload-or-restart tor@default.service 2>/dev/null \
+        || systemctl restart tor 2>/dev/null || true
+}
+
+case "${1:-show}" in
+    any)
+        rm -f "$DROPIN"
+        reload_tor
+        echo "Tor outbound port: any"
+        ;;
+    set)
+        ports="${2:-}"
+        case "$ports" in
+            ''|*[!0-9,]*) echo "usage: aegis-tor-port set <port|80,443>" >&2; exit 2 ;;
+        esac
+        {
+            echo "# managed by Aegis — restrict Tor's outbound relay ports"
+            first=1
+            printf 'ReachableAddresses '
+            # shellcheck disable=SC2086
+            IFS=,
+            for p in $ports; do
+                [ "$first" = 1 ] || printf ', '
+                printf '*:%s' "$p"
+                first=0
+            done
+            printf '\n'
+        } > "$DROPIN"
+        reload_tor
+        echo "Tor outbound port(s): $ports"
+        ;;
+    show)
+        if [ -f "$DROPIN" ]; then
+            sed -n 's/^ReachableAddresses *//p' "$DROPIN" | head -1
+        else
+            echo "any"
+        fi
+        ;;
+    *) echo "usage: aegis-tor-port {set <ports>|any|show}" >&2; exit 2 ;;
+esac

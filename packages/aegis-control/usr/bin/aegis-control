@@ -129,7 +129,7 @@ class AegisControl(Gtk.Window):
         self.stack.add_titled(self._page_tor(), "tor", "Tor")
         self.stack.add_titled(self._page_i2p(), "i2p", "I2P")
         self.stack.add_titled(self._page_vpn(), "vpn", "VPN")
-        self.stack.add_titled(self._page_split(), "split", "Split-tunnel")
+        self.stack.add_titled(self._page_split(), "split", "Custom routes")
 
         self.refresh_all()
         GLib.timeout_add_seconds(5, self._tick)
@@ -370,9 +370,9 @@ class AegisControl(Gtk.Window):
     # ---------- Split-tunnel ----------
     def _page_split(self):
         b = self._vbox()
-        b.pack_start(self._heading("Split-tunnel"), False, False, 0)
+        b.pack_start(self._heading("Custom routes (split-tunnel)"), False, False, 0)
         info = Gtk.Label(xalign=0); info.set_line_wrap(True)
-        info.set_markup(f"<small>{colored('Things listed here skip the tunnel and go DIRECT (clearnet). Use sparingly — each exception can deanonymise that traffic.', DIM)}</small>")
+        info.set_markup(f"<small>{colored('Custom routes listed here skip the tunnel and go DIRECT (clearnet). They persist across reboots and mode changes. Use sparingly — each exception can deanonymise that traffic.', DIM)}</small>")
         b.pack_start(info, False, False, 0)
 
         # Apps
@@ -492,13 +492,21 @@ class AegisControl(Gtk.Window):
         self._fill_list(self.vpn_list, names)
 
     def refresh_split(self):
-        domains = run([helper("aegis-route-domain"), "list"]).stdout.split()
-        self._fill_list(self.site_list, [d for d in domains if d])
+        # Read the persisted route stores directly (world-readable), so the lists
+        # populate without needing root / a pkexec prompt on every refresh.
+        try:
+            domains = sorted(n[:-5] for n in os.listdir("/etc/dnsmasq.d/aegis-bypass.d")
+                             if n.endswith(".conf"))
+        except OSError:
+            domains = []
+        self._fill_list(self.site_list, domains)
         ips = []
-        out = run(["sh", "-c", "nft list set inet aegis bypass4 2>/dev/null; nft list set inet aegis bypass6 2>/dev/null"]).stdout
-        for part in out.replace("\n", " ").split("elements = {", 1)[-1:]:
-            ips += [x.strip().strip("}").strip() for x in part.split(",") if x.strip().strip("}").strip()]
-        self._fill_list(self.ip_list, [i for i in ips if any(c.isdigit() for c in i)])
+        try:
+            with open("/etc/aegis/routes.d/ip.list") as f:
+                ips = [l.strip() for l in f if l.strip()]
+        except OSError:
+            pass
+        self._fill_list(self.ip_list, ips)
 
     def refresh_all(self):
         self.refresh_status_fields()

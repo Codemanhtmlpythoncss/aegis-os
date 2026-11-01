@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Tor Connection
+GenericName=Connect to Tor
+Comment=Connect to the Tor network, configure bridges, port and auto-reroute
+Exec=aegis-tor-connection
+Icon=security-high
+Terminal=false
+Categories=System;Settings;Security;Network;
+Keywords=tor;connect;bridge;obfs4;circuit;reroute;anonymity;
+StartupNotify=true

@@ -107,11 +107,17 @@ jobs:
               unsquashfs -ll _iso/live/filesystem.squashfs "usr/local/bin/$s" 2>/dev/null | grep -q "usr/local/bin/$s" || MISSING="$MISSING local:$s"
             done
             # packaged backend (aegis-firewall now ships via the .deb at /usr/sbin)
-            unsquashfs -ll _iso/live/filesystem.squashfs "usr/sbin/aegis-firewall" 2>/dev/null | grep -q "usr/sbin/aegis-firewall" || MISSING="$MISSING pkg:aegis-firewall"
+            for s in aegis-firewall aegis-route aegis-newnym aegis-reroute aegis-tor-port; do
+              unsquashfs -ll _iso/live/filesystem.squashfs "usr/sbin/$s" 2>/dev/null | grep -q "usr/sbin/$s" || MISSING="$MISSING pkg:$s"
+            done
             # friendly layer (GTK apps) must be installed from the .deb's
-            for s in aegis-control aegis-welcome; do
+            for s in aegis-control aegis-welcome aegis-tor-connection; do
               unsquashfs -ll _iso/live/filesystem.squashfs "usr/bin/$s" 2>/dev/null | grep -q "usr/bin/$s" || MISSING="$MISSING pkg:$s"
             done
+            # screensaver: the Aegis image, the skel config, and the saver binary
+            unsquashfs -ll _iso/live/filesystem.squashfs "usr/share/backgrounds/aegis/aegis-wallpaper.png" 2>/dev/null | grep -q "aegis-wallpaper.png" || MISSING="$MISSING asset:wallpaper"
+            unsquashfs -ll _iso/live/filesystem.squashfs "etc/skel/.xscreensaver" 2>/dev/null | grep -q ".xscreensaver" || MISSING="$MISSING asset:xscreensaver-cfg"
+            unsquashfs -ll _iso/live/filesystem.squashfs "usr/bin/xscreensaver" 2>/dev/null | grep -q "usr/bin/xscreensaver" || MISSING="$MISSING pkg:xscreensaver"
             if [ -n "$MISSING" ]; then echo "PAYLOAD CHECK FAILED — missing from image:$MISSING"; exit 1; fi
             echo "payload check OK: aegis helpers + packaged friendly layer present in image"
           else

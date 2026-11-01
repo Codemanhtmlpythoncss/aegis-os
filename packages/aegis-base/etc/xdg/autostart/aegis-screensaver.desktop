@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Aegis screensaver
+Comment=Run the Aegis screensaver daemon (slow pan over the Aegis wallpaper)
+Exec=xscreensaver -no-splash
+OnlyShowIn=XFCE;
+Terminal=false
+X-GNOME-Autostart-enabled=true
+NoDisplay=true

@@ -4,8 +4,13 @@ usr/sbin/aegis-route usr/sbin/
 usr/sbin/aegis-route-domain usr/sbin/
 usr/sbin/aegis-vpn usr/sbin/
 usr/sbin/aegis-tor-bridges usr/sbin/
+usr/sbin/aegis-tor-port usr/sbin/
+usr/sbin/aegis-newnym usr/sbin/
+usr/sbin/aegis-reroute usr/sbin/
 usr/bin/aegis-run-clearnet usr/bin/
 etc/aegis/nftables-tor.conf etc/aegis/
 etc/aegis/nftables-i2p.conf etc/aegis/
 etc/aegis/netmode etc/aegis/
 usr/lib/systemd/system/aegis-netmode.service usr/lib/systemd/system/
+usr/lib/systemd/system/aegis-reroute.service usr/lib/systemd/system/
+usr/lib/systemd/system/aegis-reroute.timer usr/lib/systemd/system/

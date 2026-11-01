@@ -10,18 +10,12 @@ case "$1" in
         [ -x /usr/lib/aegis/aegis-branding ] && /usr/lib/aegis/aegis-branding || true
         # Mandatory access control on.
         systemctl enable apparmor >/dev/null 2>&1 || true
-        # Show the Aegis fastfetch banner in interactive terminals (once per shell).
+        # fastfetch is installed and branded (run `fastfetch` to see the Aegis
+        # banner), but it is NOT auto-run on every terminal — that was noisy.
+        # Remove the old auto-run block if a previous build added it.
         BRC=/etc/bash.bashrc
-        if [ -f "$BRC" ] && ! grep -q 'aegis-fastfetch' "$BRC"; then
-            cat >> "$BRC" <<'FF'
-
-# >>> aegis-fastfetch >>>
-if [ -z "${AEGIS_FF:-}" ] && [ -t 1 ] && [ -z "${AEGIS_NO_FASTFETCH:-}" ] && command -v fastfetch >/dev/null 2>&1; then
-    export AEGIS_FF=1
-    fastfetch --config /etc/fastfetch/aegis.jsonc 2>/dev/null || fastfetch 2>/dev/null || true
-fi
-# <<< aegis-fastfetch <<<
-FF
+        if [ -f "$BRC" ] && grep -q 'aegis-fastfetch' "$BRC"; then
+            sed -i '/# >>> aegis-fastfetch >>>/,/# <<< aegis-fastfetch <<</d' "$BRC"
         fi
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)

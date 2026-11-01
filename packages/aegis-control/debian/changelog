@@ -1,3 +1,15 @@
+aegis-control (1.3.0) trixie; urgency=medium
+
+  * Add aegis-tor-connection: a standalone, Tails-style "Connect to Tor"
+    assistant with live bootstrap progress, automatic/bridge connection, an
+    outbound-port selector (the VPN-port analog), and an auto-reroute timer
+    (new circuit every N minutes/hours). Autostarts at login until connected.
+  * Custom routes: the Control Center's split-tunnel page is renamed "Custom
+    routes" and now reads the persisted stores directly, so added IP and domain
+    routes actually appear (and persist) instead of showing empty.
+
+ -- Aegis OS <aegis@aegis-os.localdomain>  Sun, 01 Nov 2026 17:49:24 +0000
+
 aegis-control (1.2.0) trixie; urgency=medium
 
   * Initial release: GTK Control Center — network-mode switcher, live

@@ -67,6 +67,13 @@ console-setup
 fastfetch
 zenity
 
+# --- screensaver (slow pan over the Aegis wallpaper) + image tooling ---
+# glslideshow lives in xscreensaver-gl-extra; -gl has the GL runtime it needs.
+xscreensaver
+xscreensaver-gl
+xscreensaver-gl-extra
+feh
+
 # --- Aegis control apps need these ---
 python3
 python3-gi

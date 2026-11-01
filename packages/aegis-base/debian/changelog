@@ -1,3 +1,15 @@
+aegis-base (1.3.0) trixie; urgency=medium
+
+  * New Aegis wallpaper/screensaver image: a low-key field of glossy blue
+    iso-blocks (Kali-blocks style) with the glowing Aegis shield, no tagline.
+  * Ship an Aegis screensaver: an xscreensaver skel config (slow pan over the
+    Aegis image, no lock) plus an autostart entry.
+  * Stop running fastfetch at the start of every terminal — it is still
+    installed and branded (run `fastfetch`), just no longer auto-run; the old
+    /etc/bash.bashrc hook is removed on upgrade.
+
+ -- Aegis OS <aegis@aegis-os.localdomain>  Sun, 01 Nov 2026 17:49:24 +0000
+
 aegis-base (1.2.0) trixie; urgency=medium
 
   * Initial packaging: migrate kernel hardening, module blacklists and OS

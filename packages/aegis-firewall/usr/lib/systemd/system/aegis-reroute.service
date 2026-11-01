@@ -1,0 +1,8 @@
+[Unit]
+Description=Aegis: request a new Tor circuit
+After=tor@default.service
+Documentation=man:tor(1)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/aegis-newnym

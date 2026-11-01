@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Tor Connection
+Comment=Show the Tor connection assistant at login until Tor is connected
+# --autostart: exits immediately if the mode isn't Tor, or if Tor already
+# bootstrapped to 100% before login (so it only appears when you need it).
+Exec=aegis-tor-connection --autostart
+OnlyShowIn=XFCE;
+Terminal=false
+X-GNOME-Autostart-enabled=true

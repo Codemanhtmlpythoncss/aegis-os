@@ -1,33 +1,59 @@
 #!/bin/sh
-# aegis-route — manage the split-tunnel bypass sets: destinations that skip
-# Tor/I2P and go out directly. Root only. (Domain-based bypass with live DNS
-# tracking is handled by the Split-tunnel app via dnsmasq; this manages explicit
-# IP addresses / CIDRs, and backs the app's IP handling.)
+# aegis-route — manage PERSISTENT split-tunnel IP/CIDR bypasses: destinations
+# that skip Tor/I2P and go out DIRECT. Root only. (Domain-based bypass with live
+# DNS tracking is handled separately by aegis-route-domain via dnsmasq; this
+# manages explicit IP addresses / CIDRs.)
+#
+# Entries are saved to /etc/aegis/routes.d/ip.list and re-applied into the live
+# firewall by aegis-firewall every time it (re)loads a ruleset — so a custom
+# route survives mode switches and reboots (previously it was added only to the
+# live nftables set and vanished on the next `flush ruleset`).
 #
 # Usage:
-#   aegis-route list
+#   aegis-route list                 the saved bypasses
 #   aegis-route add <ip|cidr>
 #   aegis-route del <ip|cidr>
+#   aegis-route reload               re-apply the saved list into the firewall
 set -eu
 
 [ "$(id -u)" = 0 ] || { echo "aegis-route: must run as root" >&2; exit 1; }
 
+STORE_DIR=/etc/aegis/routes.d
+STORE="$STORE_DIR/ip.list"
+mkdir -p "$STORE_DIR"
+[ -f "$STORE" ] || : > "$STORE"
+
 whichset() { case "$1" in *:*) echo bypass6 ;; *) echo bypass4 ;; esac; }
+valid()    { case "$1" in ''|*[!0-9a-fA-F:./]*) return 1 ;; *) return 0 ;; esac; }
+live_add() { nft add element inet aegis "$(whichset "$1")" "{ $1 }" 2>/dev/null || true; }
+live_del() { nft delete element inet aegis "$(whichset "$1")" "{ $1 }" 2>/dev/null || true; }
 
 case "${1:-list}" in
     list)
-        nft list set inet aegis bypass4 2>/dev/null || echo "(firewall not loaded)"
-        nft list set inet aegis bypass6 2>/dev/null || true
+        grep -v '^[[:space:]]*$' "$STORE" 2>/dev/null || true
         ;;
     add)
-        [ $# -ge 2 ] || { echo "usage: aegis-route add <ip|cidr>" >&2; exit 2; }
-        nft add element inet aegis "$(whichset "$2")" "{ $2 }" && echo "bypass added: $2"
+        v="${2:-}"; valid "$v" || { echo "invalid ip/cidr: $v" >&2; exit 2; }
+        grep -qxF "$v" "$STORE" 2>/dev/null || echo "$v" >> "$STORE"
+        live_add "$v"
+        echo "bypass added: $v"
         ;;
     del|rm|remove)
-        [ $# -ge 2 ] || { echo "usage: aegis-route del <ip|cidr>" >&2; exit 2; }
-        nft delete element inet aegis "$(whichset "$2")" "{ $2 }" && echo "bypass removed: $2"
+        v="${2:-}"; [ -n "$v" ] || { echo "usage: aegis-route del <ip|cidr>" >&2; exit 2; }
+        grep -vxF "$v" "$STORE" > "$STORE.tmp" 2>/dev/null || : > "$STORE.tmp"
+        mv "$STORE.tmp" "$STORE"
+        live_del "$v"
+        echo "bypass removed: $v"
+        ;;
+    reload)
+        n=0
+        while IFS= read -r v; do
+            [ -n "$v" ] || continue
+            live_add "$v"; n=$((n + 1))
+        done < "$STORE"
+        echo "bypass reloaded ($n entries)"
         ;;
     *)
-        echo "usage: aegis-route {list|add <ip|cidr>|del <ip|cidr>}" >&2; exit 2
+        echo "usage: aegis-route {list|add <ip|cidr>|del <ip|cidr>|reload}" >&2; exit 2
         ;;
 esac

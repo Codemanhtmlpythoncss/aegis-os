@@ -1,0 +1,45 @@
+#!/bin/sh
+# aegis-reroute — auto "new circuit" timer: make Tor switch to a fresh circuit
+# every N seconds, for as long as the user wants. Root only (driven by the Tor
+# GUI). Backed by aegis-reroute.timer -> aegis-reroute.service -> aegis-newnym.
+#   aegis-reroute set <seconds>   turn on: new circuit every <seconds>
+#   aegis-reroute off             turn off
+#   aegis-reroute status          prints "on <seconds>" or "off"
+set -eu
+[ "$(id -u)" = 0 ] || { echo "aegis-reroute: must run as root" >&2; exit 1; }
+
+DROPIN_DIR=/etc/systemd/system/aegis-reroute.timer.d
+DROPIN="$DROPIN_DIR/interval.conf"
+
+case "${1:-status}" in
+    set)
+        secs="${2:-}"
+        case "$secs" in ''|*[!0-9]*) echo "usage: aegis-reroute set <seconds>" >&2; exit 2 ;; esac
+        [ "$secs" -ge 10 ] || { echo "interval too short (minimum 10s)" >&2; exit 2; }
+        mkdir -p "$DROPIN_DIR"
+        cat > "$DROPIN" <<EOF
+[Timer]
+OnBootSec=${secs}s
+OnUnitActiveSec=${secs}s
+EOF
+        systemctl daemon-reload
+        systemctl enable --now aegis-reroute.timer >/dev/null 2>&1 \
+            || systemctl start aegis-reroute.timer
+        echo "auto-reroute on: new circuit every ${secs}s"
+        ;;
+    off)
+        systemctl disable --now aegis-reroute.timer >/dev/null 2>&1 || true
+        rm -f "$DROPIN"
+        systemctl daemon-reload 2>/dev/null || true
+        echo "auto-reroute off"
+        ;;
+    status)
+        if systemctl is-active --quiet aegis-reroute.timer 2>/dev/null; then
+            secs=$(sed -n 's/^OnUnitActiveSec=\([0-9]*\)s/\1/p' "$DROPIN" 2>/dev/null | head -1)
+            echo "on ${secs:-?}"
+        else
+            echo "off"
+        fi
+        ;;
+    *) echo "usage: aegis-reroute {set <seconds>|off|status}" >&2; exit 2 ;;
+esac

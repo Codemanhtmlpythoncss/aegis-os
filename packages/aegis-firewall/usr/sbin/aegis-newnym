@@ -1,0 +1,42 @@
+#!/usr/bin/python3
+# aegis-newnym — request a new Tor circuit (SIGNAL NEWNYM) through Tor's control
+# port. Root only (reads the control auth cookie). Used by the "New circuit"
+# button in the Tor GUI and by the auto-reroute timer (aegis-reroute.timer).
+import os
+import socket
+import sys
+
+
+def cookie_hex():
+    for p in ("/run/tor/control.authcookie", "/var/run/tor/control.authcookie"):
+        try:
+            with open(p, "rb") as f:
+                return f.read().hex()
+        except OSError:
+            continue
+    return None
+
+
+def main():
+    if os.geteuid() != 0:
+        sys.exit("aegis-newnym: must run as root")
+    try:
+        s = socket.create_connection(("127.0.0.1", 9051), timeout=5)
+    except OSError as e:
+        sys.exit(f"aegis-newnym: Tor control port unreachable: {e}")
+    s.settimeout(5)
+    ch = cookie_hex()
+    s.sendall((f"AUTHENTICATE {ch}\r\n" if ch else 'AUTHENTICATE ""\r\n').encode())
+    if not s.recv(256).startswith(b"250"):
+        s.close()
+        sys.exit("aegis-newnym: control-port authentication failed")
+    s.sendall(b"SIGNAL NEWNYM\r\n")
+    ok = s.recv(256).startswith(b"250")
+    s.sendall(b"QUIT\r\n")
+    s.close()
+    print("requested a new Tor circuit" if ok else "NEWNYM refused")
+    sys.exit(0 if ok else 1)
+
+
+if __name__ == "__main__":
+    main()

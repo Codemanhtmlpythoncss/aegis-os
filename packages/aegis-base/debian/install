@@ -7,6 +7,8 @@ etc/aegis/aegis-logo.txt etc/aegis/
 usr/lib/aegis/aegis-set-wallpaper usr/lib/aegis/
 usr/share/backgrounds/aegis/aegis-wallpaper.png usr/share/backgrounds/aegis/
 etc/xdg/autostart/aegis-wallpaper.desktop etc/xdg/autostart/
+etc/xdg/autostart/aegis-screensaver.desktop etc/xdg/autostart/
+etc/skel/.xscreensaver etc/skel/
 usr/bin/aegis-switch-de usr/bin/
 usr/lib/aegis/aegis-apply-de usr/lib/aegis/
 usr/share/applications/aegis-switch-de.desktop usr/share/applications/

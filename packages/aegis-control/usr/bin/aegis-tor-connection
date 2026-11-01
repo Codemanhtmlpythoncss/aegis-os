@@ -1,0 +1,450 @@
+#!/usr/bin/python3
+# Aegis Tor Connection — a standalone, Tails-style assistant for connecting to
+# the Tor network. Shows live bootstrap progress, lets you connect automatically
+# or via obfs4 bridges, choose which outbound port Tor uses (like a VPN port),
+# and auto-rotate to a new circuit on a timer you set.
+#
+# Runs unprivileged; it READS connection state from files directly and only uses
+# pkexec (small audited helpers in aegis-firewall) to CHANGE anything.
+import os
+import socket
+import subprocess
+
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, GLib, Pango  # noqa: E402
+
+TEAL = "#2dd4bf"
+RED = "#ef4444"
+DIM = "#8b9bb4"
+
+BRIDGES_CONF = "/etc/tor/torrc.d/10-aegis-bridges.conf"
+PORTS_CONF = "/etc/tor/torrc.d/20-aegis-ports.conf"
+REROUTE_DROPIN = "/etc/systemd/system/aegis-reroute.timer.d/interval.conf"
+DONE_FILE = os.path.expanduser("~/.config/aegis/tor-connection-shown")
+
+PORT_PRESETS = [
+    ("any", "Automatic — any relay port"),
+    ("443", "443 — HTTPS only (best on restrictive Wi-Fi)"),
+    ("80,443", "80, 443 — web ports"),
+    ("custom", "Custom…"),
+]
+
+
+def helper(name):
+    for base in ("/usr/sbin", "/usr/bin", "/usr/local/sbin", "/usr/local/bin"):
+        p = os.path.join(base, name)
+        if os.path.exists(p):
+            return p
+    return "/usr/sbin/" + name
+
+
+def run(cmd, timeout=20):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except Exception as e:  # noqa: BLE001
+        class R:
+            returncode = 1
+            stdout = ""
+            stderr = str(e)
+        return R()
+
+
+def pkexec(args, timeout=90):
+    return run(["pkexec"] + args, timeout=timeout)
+
+
+def colored(text, color):
+    return f'<span foreground="{color}">{GLib.markup_escape_text(text)}</span>'
+
+
+def is_active(unit):
+    return run(["systemctl", "is-active", unit]).stdout.strip() == "active"
+
+
+def tor_running():
+    return is_active("tor@default.service") or is_active("tor.service")
+
+
+def tor_bootstrap():
+    """(percent:int, summary:str) from Tor's control port, or (-1, msg)."""
+    cookie = None
+    for p in ("/run/tor/control.authcookie", "/var/run/tor/control.authcookie"):
+        try:
+            with open(p, "rb") as f:
+                cookie = f.read().hex()
+            break
+        except OSError:
+            continue
+    try:
+        s = socket.create_connection(("127.0.0.1", 9051), timeout=3)
+        s.settimeout(3)
+        s.sendall((f"AUTHENTICATE {cookie}\r\n" if cookie else 'AUTHENTICATE ""\r\n').encode())
+        s.recv(256)
+        s.sendall(b"GETINFO status/bootstrap-phase\r\n")
+        data = s.recv(1024).decode(errors="replace")
+        s.close()
+        pct = -1
+        for tok in data.split():
+            if tok.startswith("PROGRESS="):
+                pct = int(tok.split("=", 1)[1])
+        summ = ""
+        if "SUMMARY=" in data:
+            summ = data.split("SUMMARY=", 1)[1].strip().strip('"').split('"')[0]
+        return pct, summ
+    except Exception:  # noqa: BLE001
+        return -1, "control port unavailable"
+
+
+def read_bridges():
+    try:
+        with open(BRIDGES_CONF) as f:
+            return "\n".join(l.split("Bridge ", 1)[1].strip()
+                             for l in f if l.strip().startswith("Bridge "))
+    except OSError:
+        return ""
+
+
+def bridges_enabled():
+    try:
+        with open(BRIDGES_CONF) as f:
+            return "UseBridges 1" in f.read()
+    except OSError:
+        return False
+
+
+def read_port():
+    """Current outbound-port setting: 'any', or a comma list like '443' / '80,443'."""
+    try:
+        with open(PORTS_CONF) as f:
+            for line in f:
+                if line.startswith("ReachableAddresses"):
+                    spec = line.split(None, 1)[1]
+                    ports = [p.split(":")[-1].strip() for p in spec.split(",")]
+                    return ",".join(p for p in ports if p.isdigit()) or "any"
+    except OSError:
+        pass
+    return "any"
+
+
+def read_reroute():
+    """(enabled:bool, seconds:int|None)."""
+    on = is_active("aegis-reroute.timer")
+    secs = None
+    try:
+        with open(REROUTE_DROPIN) as f:
+            for line in f:
+                if line.startswith("OnUnitActiveSec="):
+                    val = line.split("=", 1)[1].strip().rstrip("s")
+                    if val.isdigit():
+                        secs = int(val)
+    except OSError:
+        pass
+    return on, secs
+
+
+class TorConnection(Gtk.Window):
+    def __init__(self, autostart=False):
+        super().__init__(title="Tor Connection")
+        self.set_default_size(560, 640)
+        self.set_position(Gtk.WindowPosition.CENTER)
+
+        hb = Gtk.HeaderBar(show_close_button=True, title="Connect to Tor",
+                           subtitle="Aegis · anonymity")
+        self.set_titlebar(hb)
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.add(outer)
+
+        sc = Gtk.ScrolledWindow()
+        sc.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        outer.pack_start(sc, True, True, 0)
+        b = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        b.set_border_width(20)
+        sc.add(b)
+
+        # ---- status / progress ----
+        self.title_lbl = Gtk.Label(xalign=0)
+        self.title_lbl.set_markup("<span size='x-large' weight='bold'>Connect to the Tor network</span>")
+        b.pack_start(self.title_lbl, False, False, 0)
+        self.sub_lbl = Gtk.Label(xalign=0)
+        self.sub_lbl.set_line_wrap(True)
+        self.sub_lbl.set_markup(f"<small>{colored('All Aegis traffic goes through Tor. This shows the connection and lets you tune how it connects.', DIM)}</small>")
+        b.pack_start(self.sub_lbl, False, False, 0)
+
+        self.bar = Gtk.ProgressBar(show_text=True)
+        b.pack_start(self.bar, False, False, 4)
+        self.state_lbl = Gtk.Label(xalign=0)
+        b.pack_start(self.state_lbl, False, False, 0)
+
+        b.pack_start(Gtk.Separator(), False, False, 6)
+
+        # ---- how to connect ----
+        head = Gtk.Label(xalign=0)
+        head.set_markup("<b>How should Aegis connect?</b>")
+        b.pack_start(head, False, False, 0)
+
+        self.rb_auto = Gtk.RadioButton.new_with_label_from_widget(
+            None, "Connect to Tor automatically")
+        self.rb_bridge = Gtk.RadioButton.new_with_label_from_widget(
+            self.rb_auto, "Configure a bridge (my network blocks Tor / hide Tor from my ISP)")
+        self.rb_bridge.get_child().set_line_wrap(True)
+        b.pack_start(self.rb_auto, False, False, 0)
+        b.pack_start(self.rb_bridge, False, False, 0)
+
+        self.bridge_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self.bridge_box.set_margin_start(24)
+        hint = Gtk.Label(xalign=0)
+        hint.set_line_wrap(True)
+        hint.set_markup(f"<small>{colored('Paste obfs4 bridge lines (one per line). Get them from https://bridges.torproject.org or email bridges@torproject.org.', DIM)}</small>")
+        self.bridge_box.pack_start(hint, False, False, 0)
+        self.bridges_tv = Gtk.TextView()
+        self.bridges_tv.set_monospace(True)
+        self.bridges_tv.get_buffer().set_text(read_bridges())
+        bsc = Gtk.ScrolledWindow()
+        bsc.set_size_request(-1, 86)
+        bsc.set_shadow_type(Gtk.ShadowType.IN)
+        bsc.add(self.bridges_tv)
+        self.bridge_box.pack_start(bsc, False, False, 0)
+        b.pack_start(self.bridge_box, False, False, 0)
+
+        self.rb_bridge.connect("toggled", self._sync_bridge_sensitivity)
+        if bridges_enabled():
+            self.rb_bridge.set_active(True)
+
+        # ---- which port (the VPN-port analog) ----
+        b.pack_start(Gtk.Separator(), False, False, 6)
+        phead = Gtk.Label(xalign=0)
+        phead.set_markup("<b>Connect to Tor using port</b>")
+        b.pack_start(phead, False, False, 0)
+        pnote = Gtk.Label(xalign=0)
+        pnote.set_line_wrap(True)
+        pnote.set_markup(f"<small>{colored('Like choosing a VPN port: restrict which outbound port Tor uses to reach the network. Many locked-down networks only allow 443.', DIM)}</small>")
+        b.pack_start(pnote, False, False, 0)
+
+        prow = Gtk.Box(spacing=8)
+        self.port_combo = Gtk.ComboBoxText()
+        for _key, label in PORT_PRESETS:
+            self.port_combo.append_text(label)
+        self.port_entry = Gtk.Entry()
+        self.port_entry.set_placeholder_text("e.g. 9001 or 443,9001")
+        self.port_entry.set_no_show_all(True)
+        prow.pack_start(self.port_combo, True, True, 0)
+        prow.pack_start(self.port_entry, False, False, 0)
+        b.pack_start(prow, False, False, 0)
+        self.port_combo.connect("changed", self._sync_port_entry)
+        self._preset_port(read_port())
+
+        # ---- connect button ----
+        self.connect_btn = Gtk.Button(label="Connect to Tor")
+        self.connect_btn.get_style_context().add_class("suggested-action")
+        self.connect_btn.connect("clicked", self.on_connect)
+        b.pack_start(self.connect_btn, False, False, 6)
+
+        # ---- auto-reroute ----
+        b.pack_start(Gtk.Separator(), False, False, 6)
+        rhead = Gtk.Label(xalign=0)
+        rhead.set_markup("<b>Automatic new circuit (auto-reroute)</b>")
+        b.pack_start(rhead, False, False, 0)
+        rnote = Gtk.Label(xalign=0)
+        rnote.set_line_wrap(True)
+        rnote.set_markup(f"<small>{colored('Switch to a fresh Tor circuit on a timer — keep it running for however long you want.', DIM)}</small>")
+        b.pack_start(rnote, False, False, 0)
+
+        rr = Gtk.Box(spacing=8)
+        self.rr_toggle = Gtk.CheckButton(label="New circuit every")
+        self.rr_spin = Gtk.SpinButton.new_with_range(1, 1440, 1)
+        self.rr_spin.set_value(10)
+        self.rr_unit = Gtk.ComboBoxText()
+        self.rr_unit.append_text("minutes")
+        self.rr_unit.append_text("hours")
+        self.rr_unit.set_active(0)
+        rr.pack_start(self.rr_toggle, False, False, 0)
+        rr.pack_start(self.rr_spin, False, False, 0)
+        rr.pack_start(self.rr_unit, False, False, 0)
+        b.pack_start(rr, False, False, 0)
+
+        rbtns = Gtk.Box(spacing=8)
+        apply_rr = Gtk.Button(label="Apply")
+        apply_rr.connect("clicked", self.on_apply_reroute)
+        newnow = Gtk.Button(label="New circuit now")
+        newnow.connect("clicked", self.on_newnym)
+        rbtns.pack_start(apply_rr, False, False, 0)
+        rbtns.pack_start(newnow, False, False, 0)
+        b.pack_start(rbtns, False, False, 0)
+        self._load_reroute()
+
+        # ---- footer ----
+        foot = Gtk.Box(spacing=8)
+        foot.set_margin_top(6)
+        self.browse_btn = Gtk.Button(label="Browse anonymously")
+        self.browse_btn.connect("clicked", lambda *_: subprocess.Popen(
+            ["sh", "-c", "firefox || firefox-esr"]))
+        close = Gtk.Button(label="Close")
+        close.connect("clicked", lambda *_: self.close())
+        foot.pack_start(self.browse_btn, False, False, 0)
+        foot.pack_end(close, False, False, 0)
+        b.pack_start(foot, False, False, 0)
+
+        self._sync_bridge_sensitivity()
+        self.refresh()
+        GLib.timeout_add_seconds(2, self._tick)
+
+        if autostart:
+            pct, _ = tor_bootstrap()
+            # Already connected before the user even logged in — don't nag.
+            if pct >= 100:
+                GLib.idle_add(self._mark_shown_and_quit)
+
+    # ---------- small helpers ----------
+    def toast(self, text, err=False):
+        d = Gtk.MessageDialog(transient_for=self, modal=True,
+                              message_type=(Gtk.MessageType.ERROR if err else Gtk.MessageType.INFO),
+                              buttons=Gtk.ButtonsType.OK, text=text)
+        d.run(); d.destroy()
+
+    def _mark_shown_and_quit(self):
+        try:
+            os.makedirs(os.path.dirname(DONE_FILE), exist_ok=True)
+            open(DONE_FILE, "w").close()
+        except OSError:
+            pass
+        Gtk.main_quit()
+        return False
+
+    def _sync_bridge_sensitivity(self, *_):
+        self.bridge_box.set_sensitive(self.rb_bridge.get_active())
+
+    def _sync_port_entry(self, *_):
+        key = PORT_PRESETS[self.port_combo.get_active()][0] if self.port_combo.get_active() >= 0 else "any"
+        self.port_entry.set_visible(key == "custom")
+
+    def _preset_port(self, current):
+        idx = 0
+        for i, (key, _l) in enumerate(PORT_PRESETS):
+            if key == current:
+                idx = i
+                break
+        else:
+            if current != "any":            # a custom port list
+                idx = len(PORT_PRESETS) - 1
+                self.port_entry.set_text(current)
+        self.port_combo.set_active(idx)
+        self._sync_port_entry()
+
+    def _desired_port(self):
+        i = self.port_combo.get_active()
+        key = PORT_PRESETS[i][0] if i >= 0 else "any"
+        if key == "custom":
+            return self.port_entry.get_text().strip()
+        return key
+
+    def _load_reroute(self):
+        on, secs = read_reroute()
+        self.rr_toggle.set_active(on)
+        if secs:
+            if secs % 3600 == 0:
+                self.rr_spin.set_value(secs // 3600); self.rr_unit.set_active(1)
+            else:
+                self.rr_spin.set_value(max(1, secs // 60)); self.rr_unit.set_active(0)
+
+    # ---------- actions ----------
+    def on_connect(self, _b):
+        # Bridges: save if the bridge option is chosen, else clear any old ones.
+        if self.rb_bridge.get_active():
+            buf = self.bridges_tv.get_buffer()
+            text = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), True)
+            lines = [l.strip() for l in text.splitlines() if l.strip()]
+            if not lines:
+                self.toast("Add at least one bridge line, or choose automatic.", err=True)
+                return
+            conf = ("# managed by Aegis\nUseBridges 1\n"
+                    "ClientTransportPlugin obfs4,meek_lite exec /usr/bin/obfs4proxy\n"
+                    + "".join(f"Bridge {l}\n" for l in lines))
+            r = pkexec([helper("aegis-tor-bridges"), "save", conf])
+            if r.returncode != 0:
+                self.toast(f"Bridges failed: {r.stderr.strip() or 'cancelled'}", err=True)
+                return
+        elif bridges_enabled():
+            pkexec([helper("aegis-tor-bridges"), "clear"])
+
+        # Outbound port restriction.
+        port = self._desired_port()
+        if port in ("", "any"):
+            pkexec([helper("aegis-tor-port"), "any"])
+        else:
+            pkexec([helper("aegis-tor-port"), "set", port])
+
+        # Make sure Tor is up (the helpers already reconnect it when they change
+        # config; this covers the plain automatic path).
+        pkexec(["systemctl", "start", "tor@default.service"])
+        self.state_lbl.set_markup(colored("Connecting…", TEAL))
+        self.refresh()
+
+    def on_apply_reroute(self, _b):
+        if not self.rr_toggle.get_active():
+            r = pkexec([helper("aegis-reroute"), "off"])
+            self.toast("Auto-reroute turned off." if r.returncode == 0
+                       else f"Failed: {r.stderr.strip() or 'cancelled'}", err=(r.returncode != 0))
+            return
+        n = int(self.rr_spin.get_value())
+        secs = n * (3600 if self.rr_unit.get_active() == 1 else 60)
+        r = pkexec([helper("aegis-reroute"), "set", str(secs)])
+        unit = "hour(s)" if self.rr_unit.get_active() == 1 else "minute(s)"
+        self.toast(f"Auto-reroute on: a new circuit every {n} {unit}." if r.returncode == 0
+                   else f"Failed: {r.stderr.strip() or 'cancelled'}", err=(r.returncode != 0))
+
+    def on_newnym(self, _b):
+        r = pkexec([helper("aegis-newnym")])
+        self.toast("Switched to a new Tor circuit." if r.returncode == 0
+                   else f"Could not get a new circuit: {r.stderr.strip() or 'cancelled'}",
+                   err=(r.returncode != 0))
+
+    # ---------- live refresh ----------
+    def refresh(self):
+        pct, summ = tor_bootstrap()
+        running = tor_running()
+        if pct >= 100:
+            self.bar.set_fraction(1.0)
+            self.bar.set_text("Connected to Tor")
+            self.state_lbl.set_markup("✔ " + colored("You are connected to Tor.", TEAL))
+            self.title_lbl.set_markup("<span size='x-large' weight='bold'>Connected to Tor</span>")
+            self.connect_btn.set_label("Reconnect")
+            self.browse_btn.set_sensitive(True)
+        elif pct >= 0:
+            self.bar.set_fraction(pct / 100.0)
+            self.bar.set_text(f"{pct}% — {summ}")
+            self.state_lbl.set_markup(colored(f"Bootstrapping… {summ}", DIM))
+            self.browse_btn.set_sensitive(False)
+        else:
+            self.bar.set_fraction(1.0 if running else 0.0)
+            self.bar.set_text("starting…" if running else "not connected")
+            self.state_lbl.set_markup(colored("Tor is starting…" if running else "Not connected yet.",
+                                              DIM if running else RED))
+            self.browse_btn.set_sensitive(False)
+
+    def _tick(self):
+        self.refresh()
+        return True
+
+
+def main():
+    import sys
+    autostart = "--autostart" in sys.argv
+    if autostart:
+        # Only relevant when traffic actually goes via Tor.
+        try:
+            with open("/etc/aegis/netmode") as f:
+                if f.read().strip() not in ("tor", "both", ""):
+                    return
+        except OSError:
+            pass
+    win = TorConnection(autostart=autostart)
+    win.connect("destroy", Gtk.main_quit)
+    win.show_all()
+    win._sync_port_entry()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,3 +1,16 @@
+aegis-firewall (1.3.0) trixie; urgency=medium
+
+  * aegis-route: persist IP/CIDR custom routes to /etc/aegis/routes.d/ip.list and
+    re-apply them on every ruleset (re)load, so split-tunnel routes now survive
+    mode switches and reboots (they used to vanish on the next `flush ruleset`).
+  * Add aegis-tor-port: restrict Tor's outbound relay port(s) via
+    ReachableAddresses — like choosing a VPN port (e.g. 443 on locked-down nets).
+  * Add aegis-newnym + aegis-reroute (+ aegis-reroute.service/.timer): request a
+    new Tor circuit on demand, or automatically every N seconds for as long as
+    the user wants (the timer stays disabled until the Tor GUI turns it on).
+
+ -- Aegis OS <aegis@aegis-os.localdomain>  Sun, 01 Nov 2026 17:49:24 +0000
+
 aegis-firewall (1.2.0) trixie; urgency=medium
 
   * Initial packaging: aegis-firewall, the nftables Tor ruleset and the

@@ -1,0 +1,30 @@
+# Aegis screensaver defaults.
+# One mode only: a slow, low-key pan over the Aegis block wallpaper.
+# Blanks after 5 minutes idle. It does NOT lock (the live session has no
+# per-user password to unlock with); turn locking on from the Screensaver
+# settings if you install to disk and want it.
+
+timeout:	0:05:00
+cycle:		0:10:00
+lock:		False
+lockTimeout:	0:00:00
+fade:		True
+unfade:		True
+fadeSeconds:	0:00:03
+splash:		False
+
+dpmsEnabled:	True
+dpmsStandby:	0:15:00
+dpmsSuspend:	0:20:00
+dpmsOff:	0:30:00
+
+# Show the Aegis wallpaper (the only image in this directory), nothing else.
+grabDesktopImages:  False
+grabVideoFrames:    False
+chooseRandomImages:  True
+imageDirectory:	/usr/share/backgrounds/aegis
+
+mode:		one
+selected:	0
+programs:								      \
+  "Aegis"  glslideshow -root -duration 20 -pan 6 -zoom 110 -fade 4	    \n

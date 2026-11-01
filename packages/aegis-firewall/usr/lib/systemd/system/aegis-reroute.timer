@@ -1,0 +1,14 @@
+[Unit]
+Description=Aegis: periodically switch Tor to a new circuit
+
+[Timer]
+# The real interval is written by `aegis-reroute set <seconds>` as a drop-in
+# (aegis-reroute.timer.d/interval.conf). These are harmless defaults so the unit
+# is valid before the user turns auto-reroute on. The timer is only enabled when
+# the user asks for it, so these defaults never fire on their own.
+OnBootSec=10min
+OnUnitActiveSec=10min
+Persistent=false
+
+[Install]
+WantedBy=timers.target

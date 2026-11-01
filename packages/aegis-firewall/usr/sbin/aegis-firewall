@@ -41,6 +41,13 @@ EOF
 }
 clear_i2p_proxy() { rm -f "$PROXY_ENV"; }
 
+# Re-apply saved split-tunnel IP/CIDR bypasses into the freshly loaded ruleset.
+# `flush ruleset` recreates the bypass sets empty, so without this every custom
+# IP route would vanish on each mode switch / reboot.
+reload_bypass() {
+    [ -x /usr/sbin/aegis-route ] && /usr/sbin/aegis-route reload >/dev/null 2>&1 || true
+}
+
 # dnsmasq as the local resolver, forwarding to Tor's DNSPort. This is what makes
 # name resolution work under the fail-closed firewall: without it resolv.conf is
 # empty (or a stub the firewall blocks) and every lookup fails ("couldn't resolve
@@ -72,6 +79,7 @@ apply_tor() {
     load_rules "$TOR_RULES"
     systemctl --no-block start tor@default.service 2>/dev/null || systemctl --no-block start tor 2>/dev/null || true
     ensure_tor_dns
+    reload_bypass
     clear_i2p_proxy
     echo "Firewall: TOR transparent mode (fail-closed). All traffic via Tor."
 }
@@ -92,6 +100,7 @@ apply_both() {
     systemctl --no-block start tor@default.service 2>/dev/null || systemctl --no-block start tor 2>/dev/null || true
     systemctl --no-block start i2pd 2>/dev/null || true
     ensure_tor_dns
+    reload_bypass
     clear_i2p_proxy
     echo "Firewall: BOTH. Tor transparent for everything; i2pd proxies on 127.0.0.1:4444/4447 for .i2p."
 }
@@ -118,6 +127,7 @@ table inet aegis {
   chain forward { type filter hook forward priority 0; policy drop; }
 }
 EOF
+    reload_bypass
     clear_i2p_proxy
     echo "Firewall: VPN kill-switch. Only the VPN tunnel (+ handshake) may reach the network."
 }
