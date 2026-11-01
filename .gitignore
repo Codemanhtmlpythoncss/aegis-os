@@ -38,6 +38,20 @@ config/includes.chroot/usr/share/aegis/
 config/package-lists/de-xfce.list.chroot
 config/package-lists/browser-firefox.list.chroot
 
+# --- Debian package build artifacts (built in CI, never committed) ---
+packages/*.deb
+packages/*.changes
+packages/*.buildinfo
+packages/out/
+packages/**/debian/.debhelper/
+packages/**/debian/debhelper-build-stamp
+packages/**/debian/files
+packages/**/debian/*.substvars
+packages/**/debian/*.debhelper.log
+packages/**/debian/aegis-base/
+packages/**/debian/aegis-firewall/
+packages/**/debian/aegis-meta/
+
 # --- python / editor cruft ---
 __pycache__/
 *.pyc

@@ -1,0 +1,6 @@
+aegis-base (1.2.0) trixie; urgency=medium
+
+  * Initial packaging: migrate kernel hardening, module blacklists and OS
+    branding from the live-build hooks into a proper Debian package.
+
+ -- Aegis OS <aegis@aegis-os.localdomain>  Sat, 01 Nov 2026 09:40:00 +0000

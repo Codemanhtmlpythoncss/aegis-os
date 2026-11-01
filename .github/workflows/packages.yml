@@ -1,0 +1,74 @@
+name: build-packages
+
+# Builds every Aegis Debian source package under packages/ into .deb binaries,
+# in a Debian trixie container (matching the target base). This is the first
+# half of turning Aegis into a real distro: the next step publishes these to a
+# signed APT repo on GitHub Pages so `apt upgrade` delivers Aegis + Debian fixes.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'packages/**'
+      - '.github/workflows/packages.yml'
+  pull_request:
+    paths:
+      - 'packages/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - name: Install build tooling
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential debhelper devscripts dpkg-dev fakeroot lintian \
+            git ca-certificates
+
+      - uses: actions/checkout@v4
+
+      - name: Build all Aegis packages
+        run: |
+          set -eu
+          mkdir -p out
+          built=0
+          for d in packages/*/; do
+            [ -f "${d}debian/control" ] || continue
+            name=$(basename "$d")
+            echo "::group::build $name"
+            ( cd "$d" && dpkg-buildpackage -us -uc -b -d )
+            echo "::endgroup::"
+            built=$((built+1))
+          done
+          # .debs are emitted into packages/ (the parent of each source dir).
+          mv packages/*.deb out/ 2>/dev/null || true
+          echo "built $built source package(s)"
+          echo "=== resulting .deb files ==="
+          ls -la out/
+          [ "$(ls out/*.deb 2>/dev/null | wc -l)" -ge 1 ] || { echo "NO .deb PRODUCED"; exit 1; }
+
+      - name: Show package contents + metadata
+        run: |
+          for f in out/*.deb; do
+            echo "::group::$f"
+            dpkg-deb -I "$f"
+            echo "---- files ----"
+            dpkg-deb -c "$f" | awk '{print $1, $NF}'
+            echo "::endgroup::"
+          done
+
+      - name: Lint (advisory, non-fatal)
+        run: lintian --no-tag-display-limit --suppress-tags bad-distribution-in-changes-file out/*.deb || true
+
+      - name: Upload .deb artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aegis-debs
+          path: out/*.deb
+          if-no-files-found: error

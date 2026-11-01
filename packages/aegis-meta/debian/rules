@@ -1,0 +1,4 @@
+#!/usr/bin/make -f
+# Aegis OS metapackage (no payload; dependencies only).
+%:
+	dh $@

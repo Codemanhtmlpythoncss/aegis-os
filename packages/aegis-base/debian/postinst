@@ -1,0 +1,19 @@
+#!/bin/sh
+# aegis-base postinst
+set -e
+
+case "$1" in
+    configure)
+        # Apply sysctl now (best-effort; some keys are absent in containers/VMs).
+        sysctl --system >/dev/null 2>&1 || true
+        # Brand the OS as Aegis (keeps ID=debian so apt/compat stays intact).
+        [ -x /usr/lib/aegis/aegis-branding ] && /usr/lib/aegis/aegis-branding || true
+        # Mandatory access control on.
+        systemctl enable apparmor >/dev/null 2>&1 || true
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

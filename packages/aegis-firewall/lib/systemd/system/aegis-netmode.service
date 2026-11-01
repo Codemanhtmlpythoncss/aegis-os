@@ -1,0 +1,16 @@
+# Applies the selected Aegis network mode (firewall + routing) at boot.
+# The mode is read from /etc/aegis/netmode (tor|i2p|both|direct), which the
+# Setup Wizard / Control Center writes. Defaults to 'tor' if the file is missing.
+[Unit]
+Description=Aegis network mode (firewall + anonymity routing)
+After=network-pre.target
+Wants=network-pre.target
+Before=network-online.target NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c '/usr/sbin/aegis-firewall "$(cat /etc/aegis/netmode 2>/dev/null || echo tor)"'
+
+[Install]
+WantedBy=multi-user.target

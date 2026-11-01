@@ -1,0 +1,6 @@
+aegis-meta (1.2.0) trixie; urgency=medium
+
+  * Initial metapackage pulling in aegis-base and aegis-firewall. Grows as more
+    Aegis components are packaged.
+
+ -- Aegis OS <aegis@aegis-os.localdomain>  Sat, 01 Nov 2026 09:40:00 +0000

@@ -1,0 +1,22 @@
+Source: aegis-base
+Section: admin
+Priority: optional
+Maintainer: Aegis OS <aegis@aegis-os.localdomain>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/Codemanhtmlpythoncss/aegis-os
+Rules-Requires-Root: no
+
+Package: aegis-base
+Architecture: all
+Depends: ${misc:Depends}, apparmor, apparmor-profiles
+Recommends: apparmor-profiles-extra
+Description: Aegis OS base integration and kernel hardening
+ Core Aegis OS integration installed on every Aegis system:
+  * conservative kernel hardening via sysctl (kptr/dmesg restrict, ptrace
+    scope, BPF/userns limits, rp_filter, ASLR, ...);
+  * module blacklists that cut attack surface (dccp/sctp/rds/firewire/...);
+  * AppArmor enablement;
+  * OS branding (os-release / issue / motd / GRUB distributor).
+ .
+ This package is pulled in by the aegis-meta metapackage.

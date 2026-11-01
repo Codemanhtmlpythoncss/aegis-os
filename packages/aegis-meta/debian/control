@@ -1,0 +1,19 @@
+Source: aegis-meta
+Section: metapackages
+Priority: optional
+Maintainer: Aegis OS <aegis@aegis-os.localdomain>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/Codemanhtmlpythoncss/aegis-os
+Rules-Requires-Root: no
+
+Package: aegis-meta
+Architecture: all
+Depends: ${misc:Depends},
+         aegis-base (>= 1.2.0),
+         aegis-firewall (>= 1.2.0)
+Description: Aegis OS — full metapackage
+ Installs the complete Aegis OS integration. Adding the Aegis APT repository and
+ installing this package turns a Debian system into Aegis OS; the Aegis live and
+ installer images are built from it. As more components are packaged
+ (aegis-anon, aegis-live, aegis-desktop, aegis-control) they are added here.

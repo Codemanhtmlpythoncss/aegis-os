@@ -1,0 +1,10 @@
+#!/usr/bin/make -f
+# Aegis OS firewall package.
+%:
+	dh $@
+
+# Enable aegis-netmode so it applies the firewall at the next boot, but do NOT
+# start it during package configuration (it reflushes nftables / touches routing,
+# which we don't want to do underneath a running session or inside a build chroot).
+override_dh_installsystemd:
+	dh_installsystemd --no-start aegis-netmode.service

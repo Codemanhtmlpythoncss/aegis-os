@@ -1,0 +1,3 @@
+etc/sysctl.d/99-aegis-hardening.conf etc/sysctl.d/
+etc/modprobe.d/aegis-hardening.conf etc/modprobe.d/
+usr/lib/aegis/aegis-branding usr/lib/aegis/
