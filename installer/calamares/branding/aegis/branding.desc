@@ -8,14 +8,14 @@ windowSize: 900px,560px
 strings:
   productName:          Aegis OS
   shortProductName:     Aegis
-  version:              1.0
-  shortVersion:         1.0
-  versionedName:        Aegis OS 1.0
-  shortVersionedName:   Aegis 1.0
+  version:              1.2
+  shortVersion:         1.2
+  versionedName:        Aegis OS 1.2
+  shortVersionedName:   Aegis 1.2
   bootloaderEntryName:  Aegis
-  productUrl:           "https://example.invalid/aegis"
-  supportUrl:           "https://example.invalid/aegis/support"
-  releaseNotesUrl:      "https://example.invalid/aegis/notes"
+  productUrl:           "https://github.com/Codemanhtmlpythoncss/aegis-os"
+  supportUrl:           "https://github.com/Codemanhtmlpythoncss/aegis-os/issues"
+  releaseNotesUrl:      "https://github.com/Codemanhtmlpythoncss/aegis-os/releases"
 
 images:
   productLogo:  "logo.svg"

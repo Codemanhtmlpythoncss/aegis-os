@@ -17,6 +17,8 @@ aegis-base (1.3.0) trixie; urgency=medium
   * Put all the Aegis apps on the desktop: a hook seeds /etc/skel/Desktop with
     launchers for Control Center, Tor Connection, Welcome, Switch Desktop and
     the installer.
+  * Version shown consistently as 1.2 (PRETTY_NAME + VERSION_ID in os-release),
+    so the OS banner and the installer no longer disagree (installer said 1.0).
 
  -- Aegis OS <aegis@aegis-os.localdomain>  Sun, 01 Nov 2026 17:49:24 +0000
 

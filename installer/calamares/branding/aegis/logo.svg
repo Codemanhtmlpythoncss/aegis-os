@@ -1,10 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Aegis OS">
-  <!-- angular shield: flat, bold, no gradient -->
-  <path d="M48 42 H208 V116 L128 230 L48 116 Z"
-        fill="#0f1522" stroke="#e9eef5" stroke-width="4" stroke-linejoin="round"/>
-  <!-- bold 'A' monogram, single accent -->
-  <path d="M93 174 L128 76 L163 174"
-        fill="none" stroke="#2dd4bf" stroke-width="19" stroke-linejoin="miter" stroke-linecap="square"/>
-  <path d="M108 141 H148"
-        fill="none" stroke="#2dd4bf" stroke-width="15" stroke-linecap="square"/>
+  <!-- Aegis shield, matching the wallpaper: teal rim, dark fill, bold teal 'A', soft glow. -->
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4.5" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#glow)">
+    <!-- shield: rounded top shoulders, curved taper to a point -->
+    <path d="M72 46 L184 46 Q200 46 200 62 L200 150 Q200 190 128 226 Q56 190 56 150 L56 62 Q56 46 72 46 Z"
+          fill="#101a2c" stroke="#2dd4bf" stroke-width="7" stroke-linejoin="round"/>
+    <!-- bold 'A' monogram -->
+    <g stroke="#2dd4bf" fill="none" stroke-linecap="butt" stroke-linejoin="miter">
+      <path d="M128 94 L100 178" stroke-width="21"/>
+      <path d="M128 94 L156 178" stroke-width="21"/>
+      <path d="M110 152 L146 152" stroke-width="16"/>
+    </g>
+  </g>
 </svg>
