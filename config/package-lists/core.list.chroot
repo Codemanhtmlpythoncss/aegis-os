@@ -75,3 +75,8 @@ gir1.2-gtk-3.0
 gir1.2-notify-0.7
 polkitd
 pkexec
+
+# --- audio (pipewire; one stack for every DE, provides the pulse API) ---
+pipewire
+pipewire-pulse
+wireplumber
