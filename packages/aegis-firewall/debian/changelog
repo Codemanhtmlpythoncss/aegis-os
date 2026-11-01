@@ -5,5 +5,13 @@ aegis-firewall (1.2.0) trixie; urgency=medium
     at /usr/sbin/aegis-firewall and reads /etc/aegis/nftables-tor.conf.
   * Add aegis-netmode-set: persist + apply a network mode in one privileged
     step (invoked via pkexec from the Aegis Control Center).
+  * FIX Tor browsing: the old blanket LAN bypass (10.0.0.0/8) swallowed Tor's
+    AutomapHostsOnResolve range (10.192.0.0/10), so resolved sites went out
+    direct and nothing loaded. Route everything through Tor instead; no LAN bypass.
+  * Split-tunnel: nftables bypass sets (bypass4/bypass6) + the aegis-clearnet
+    group, with aegis-route (exclude IPs) and aegis-run-clearnet (run an app
+    outside the tunnel). postinst creates the aegis-clearnet group (gid 700).
+  * I2P "everything" mode: fail-closed ruleset (nftables-i2p.conf) where only
+    i2pd egresses, plus a system HTTP-proxy drop-in to the I2P proxy.
 
  -- Aegis OS <aegis@aegis-os.localdomain>  Sat, 01 Nov 2026 09:40:00 +0000

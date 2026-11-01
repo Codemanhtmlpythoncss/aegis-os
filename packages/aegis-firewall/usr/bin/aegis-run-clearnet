@@ -1,0 +1,16 @@
+#!/bin/bash
+# aegis-run-clearnet — launch an app OUTSIDE the Tor/I2P tunnel (direct clearnet).
+# The app runs with the aegis-clearnet group as its effective group; the Aegis
+# firewall lets that group's sockets egress directly instead of through Tor/I2P.
+# Usage: aegis-run-clearnet <command> [args...]
+set -eu
+
+[ $# -ge 1 ] || { echo "usage: aegis-run-clearnet <command> [args...]" >&2; exit 2; }
+getent group aegis-clearnet >/dev/null 2>&1 || {
+    echo "aegis-run-clearnet: the aegis-clearnet group is missing (is aegis-firewall installed?)" >&2
+    exit 1
+}
+# sg runs the command with aegis-clearnet as the effective group (no root needed
+# as long as the user is a member). %q keeps arguments safe.
+cmd=$(printf '%q ' "$@")
+exec sg aegis-clearnet -c "$cmd"

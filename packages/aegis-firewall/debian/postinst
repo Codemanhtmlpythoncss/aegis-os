@@ -1,0 +1,18 @@
+#!/bin/sh
+# aegis-firewall postinst
+set -e
+
+case "$1" in
+    configure)
+        # Split-tunnel "clearnet" group: apps launched in it (aegis-run-clearnet)
+        # bypass the Tor/I2P tunnel. Fixed gid 700 to match the nftables rulesets.
+        if ! getent group aegis-clearnet >/dev/null 2>&1; then
+            groupadd -r -g 700 aegis-clearnet 2>/dev/null \
+                || addgroup --system --gid 700 aegis-clearnet 2>/dev/null \
+                || groupadd -r aegis-clearnet 2>/dev/null || true
+        fi
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

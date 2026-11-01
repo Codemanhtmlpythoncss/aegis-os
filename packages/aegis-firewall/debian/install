@@ -1,5 +1,8 @@
 usr/sbin/aegis-firewall usr/sbin/
 usr/sbin/aegis-netmode-set usr/sbin/
+usr/sbin/aegis-route usr/sbin/
+usr/bin/aegis-run-clearnet usr/bin/
 etc/aegis/nftables-tor.conf etc/aegis/
+etc/aegis/nftables-i2p.conf etc/aegis/
 etc/aegis/netmode etc/aegis/
 usr/lib/systemd/system/aegis-netmode.service usr/lib/systemd/system/

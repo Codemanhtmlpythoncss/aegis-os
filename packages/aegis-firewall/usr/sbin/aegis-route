@@ -1,0 +1,33 @@
+#!/bin/sh
+# aegis-route — manage the split-tunnel bypass sets: destinations that skip
+# Tor/I2P and go out directly. Root only. (Domain-based bypass with live DNS
+# tracking is handled by the Split-tunnel app via dnsmasq; this manages explicit
+# IP addresses / CIDRs, and backs the app's IP handling.)
+#
+# Usage:
+#   aegis-route list
+#   aegis-route add <ip|cidr>
+#   aegis-route del <ip|cidr>
+set -eu
+
+[ "$(id -u)" = 0 ] || { echo "aegis-route: must run as root" >&2; exit 1; }
+
+whichset() { case "$1" in *:*) echo bypass6 ;; *) echo bypass4 ;; esac; }
+
+case "${1:-list}" in
+    list)
+        nft list set inet aegis bypass4 2>/dev/null || echo "(firewall not loaded)"
+        nft list set inet aegis bypass6 2>/dev/null || true
+        ;;
+    add)
+        [ $# -ge 2 ] || { echo "usage: aegis-route add <ip|cidr>" >&2; exit 2; }
+        nft add element inet aegis "$(whichset "$2")" "{ $2 }" && echo "bypass added: $2"
+        ;;
+    del|rm|remove)
+        [ $# -ge 2 ] || { echo "usage: aegis-route del <ip|cidr>" >&2; exit 2; }
+        nft delete element inet aegis "$(whichset "$2")" "{ $2 }" && echo "bypass removed: $2"
+        ;;
+    *)
+        echo "usage: aegis-route {list|add <ip|cidr>|del <ip|cidr>}" >&2; exit 2
+        ;;
+esac

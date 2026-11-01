@@ -1,44 +1,73 @@
 #!/bin/bash
 # aegis-firewall — apply the network mode's firewall. Run as root.
 # Usage: aegis-firewall {tor|i2p|both|direct|status}
+#
+# Routing model: everything is forced through Tor (tor/both) or I2P (i2p),
+# fail-closed. The only escapes are the split-tunnel sets (bypass4/bypass6,
+# managed by aegis-route) and apps launched in the aegis-clearnet group
+# (aegis-run-clearnet). There is no blanket LAN bypass.
 set -euo pipefail
 
 TOR_RULES=/etc/aegis/nftables-tor.conf
+I2P_RULES=/etc/aegis/nftables-i2p.conf
+PROXY_ENV=/etc/profile.d/10-aegis-i2p-proxy.sh
 
 die() { echo "aegis-firewall: $*" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || die "must run as root"
 
-tor_uid() { id -u debian-tor 2>/dev/null || echo 109; }
+tor_uid()     { id -u debian-tor 2>/dev/null || echo 109; }
+i2pd_uid()    { id -u i2pd 2>/dev/null || echo 108; }
+clearnet_gid(){ getent group aegis-clearnet 2>/dev/null | cut -d: -f3 || echo 700; }
+
+# Substitute the real uids/gids into a ruleset file, then load it.
+load_rules() {
+    local f="$1"
+    sed -e "s/^define TOR_UID.*/define TOR_UID = $(tor_uid)/" \
+        -e "s/^define I2PD_UID.*/define I2PD_UID = $(i2pd_uid)/" \
+        -e "s/^define CLEARNET_GID.*/define CLEARNET_GID = $(clearnet_gid)/" \
+        "$f" | nft -f -
+}
+
+# System HTTP(S) proxy -> i2pd (for proxy-aware apps in I2P mode); cleared otherwise.
+set_i2p_proxy() {
+    cat > "$PROXY_ENV" <<'EOF'
+# Aegis: route proxy-aware apps through the I2P HTTP proxy (set in I2P mode).
+export http_proxy="http://127.0.0.1:4444"
+export https_proxy="http://127.0.0.1:4444"
+export HTTP_PROXY="$http_proxy"
+export HTTPS_PROXY="$https_proxy"
+export no_proxy="127.0.0.1,localhost"
+EOF
+}
+clear_i2p_proxy() { rm -f "$PROXY_ENV"; }
 
 apply_tor() {
-    local uid; uid=$(tor_uid)
-    # Rewrite the TOR_UID define to the real uid, then load.
-    sed "s/^define TOR_UID.*/define TOR_UID = ${uid}/" "$TOR_RULES" | nft -f -
-    # Ensure tor is up WITHOUT a restart: at boot a 'restart' here creates a
-    # conflicting job transaction that cancels other services. 'start --no-block'
-    # is a no-op if already (being) started, and never blocks this oneshot.
+    load_rules "$TOR_RULES"
     systemctl --no-block start tor@default.service 2>/dev/null || systemctl --no-block start tor 2>/dev/null || true
+    clear_i2p_proxy
     echo "Firewall: TOR transparent mode (fail-closed). All traffic via Tor."
 }
 
-apply_direct() {
-    # Minimal stateful firewall, no forced routing (used by offensive profile).
-    nft -f - <<'EOF'
-flush ruleset
-table inet aegis {
-  chain input   { type filter hook input priority 0; policy drop;
-                  ct state established,related accept; iif "lo" accept; }
-  chain forward { type filter hook forward priority 0; policy drop; }
-  chain output  { type filter hook output priority 0; policy accept; }
-}
-EOF
-    echo "Firewall: DIRECT mode. No forced anonymity routing (NOT anonymous)."
+apply_i2p() {
+    load_rules "$I2P_RULES"
+    systemctl --no-block start i2pd 2>/dev/null || true
+    set_i2p_proxy
+    echo "Firewall: I2P mode (fail-closed). Only i2pd egresses; apps use 127.0.0.1:4444 (HTTP) / 4447 (SOCKS)."
+    echo "          .i2p works natively; clearnet is carried by i2pd's HTTP outproxy."
 }
 
-apply_i2p() {
-    # I2P is a userspace overlay (i2pd). We don't transparently proxy everything
-    # through it; instead we run a tight firewall and expose i2pd's SOCKS/HTTP
-    # proxies (127.0.0.1:4447 / 4444). Apps opt in via proxy settings.
+apply_both() {
+    load_rules "$TOR_RULES"
+    # Also let i2pd reach the network directly, alongside Tor transparent routing.
+    nft insert rule inet aegis output_nat    meta skuid "$(i2pd_uid)" accept 2>/dev/null || true
+    nft insert rule inet aegis output_filter meta skuid "$(i2pd_uid)" accept 2>/dev/null || true
+    systemctl --no-block start tor@default.service 2>/dev/null || systemctl --no-block start tor 2>/dev/null || true
+    systemctl --no-block start i2pd 2>/dev/null || true
+    clear_i2p_proxy
+    echo "Firewall: BOTH. Tor transparent for everything; i2pd proxies on 127.0.0.1:4444/4447 for .i2p."
+}
+
+apply_direct() {
     nft -f - <<'EOF'
 flush ruleset
 table inet aegis {
@@ -48,16 +77,15 @@ table inet aegis {
   chain output  { type filter hook output priority 0; policy accept; }
 }
 EOF
-    systemctl --no-block start i2pd 2>/dev/null || true
-    echo "Firewall: I2P mode. i2pd proxies on 127.0.0.1:4444 (HTTP) / 4447 (SOCKS)."
+    clear_i2p_proxy
+    echo "Firewall: DIRECT mode. No forced anonymity routing (NOT anonymous)."
 }
 
 case "${1:-status}" in
     tor)    apply_tor ;;
-    direct) apply_direct ;;
     i2p)    apply_i2p ;;
-    both)   apply_tor; systemctl --no-block start i2pd 2>/dev/null || true
-            echo "Plus i2pd proxies on 127.0.0.1:4444/4447 (I2P-only destinations)." ;;
+    both)   apply_both ;;
+    direct) apply_direct ;;
     status) nft list ruleset ;;
     *) die "usage: aegis-firewall {tor|i2p|both|direct|status}" ;;
 esac

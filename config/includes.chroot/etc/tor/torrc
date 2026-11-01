@@ -1,4 +1,4 @@
-# Aegis torrc — transparent proxy + DNS, matching /etc/nftables-tor.conf.
+# Aegis torrc — transparent proxy + DNS, matching /etc/aegis/nftables-tor.conf.
 # Keep this in sync with aegis-firewall.
 
 # SOCKS for apps that are Tor-aware (Firefox proxy, torsocks).
