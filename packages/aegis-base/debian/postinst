@@ -10,12 +10,25 @@ case "$1" in
         [ -x /usr/lib/aegis/aegis-branding ] && /usr/lib/aegis/aegis-branding || true
         # Mandatory access control on.
         systemctl enable apparmor >/dev/null 2>&1 || true
-        # fastfetch is installed and branded (run `fastfetch` to see the Aegis
-        # banner), but it is NOT auto-run on every terminal — that was noisy.
-        # Remove the old auto-run block if a previous build added it.
+        # fastfetch is NOT auto-run on every terminal (that was noisy). Remove the
+        # old auto-run block if a previous build added it.
         BRC=/etc/bash.bashrc
         if [ -f "$BRC" ] && grep -q 'aegis-fastfetch' "$BRC"; then
             sed -i '/# >>> aegis-fastfetch >>>/,/# <<< aegis-fastfetch <<</d' "$BRC"
+        fi
+        # Make `fastfetch` / `fetch` show the animated spinning-shield banner
+        # (aegis-fetch). Interactive aliases only — scripts still get the real
+        # fastfetch, and aegis-fetch calls it by path, so there's no recursion.
+        if [ -f "$BRC" ] && ! grep -q '# >>> aegis-fetch >>>' "$BRC"; then
+            cat >> "$BRC" <<'AF'
+
+# >>> aegis-fetch >>>
+# `fastfetch` / `fetch` play the animated Aegis spinning-shield banner.
+# Use `command fastfetch` or `aegis-fetch --no-spin` for a static banner.
+alias fetch='aegis-fetch'
+alias fastfetch='aegis-fetch'
+# <<< aegis-fetch <<<
+AF
         fi
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)

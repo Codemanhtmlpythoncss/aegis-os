@@ -4,9 +4,12 @@ aegis-base (1.3.0) trixie; urgency=medium
     iso-blocks (Kali-blocks style) with the glowing Aegis shield, no tagline.
   * Ship an Aegis screensaver: an xscreensaver skel config (slow pan over the
     Aegis image, no lock) plus an autostart entry.
-  * Stop running fastfetch at the start of every terminal — it is still
-    installed and branded (run `fastfetch`), just no longer auto-run; the old
-    /etc/bash.bashrc hook is removed on upgrade.
+  * Stop running fastfetch at the start of every terminal (the old
+    /etc/bash.bashrc auto-run hook is removed on upgrade).
+  * Add aegis-fetch: an animated "spinning shield" banner (a coin-flip rotation
+    of the Aegis shield in truecolor ANSI) that resolves into the normal
+    fastfetch system info. `fastfetch` / `fetch` are aliased to it in
+    interactive shells; `aegis-fetch --no-spin` gives the static banner.
 
  -- Aegis OS <aegis@aegis-os.localdomain>  Sun, 01 Nov 2026 17:49:24 +0000
 

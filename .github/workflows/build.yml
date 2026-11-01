@@ -118,6 +118,8 @@ jobs:
             unsquashfs -ll _iso/live/filesystem.squashfs "usr/share/backgrounds/aegis/aegis-wallpaper.png" 2>/dev/null | grep -q "aegis-wallpaper.png" || MISSING="$MISSING asset:wallpaper"
             unsquashfs -ll _iso/live/filesystem.squashfs "etc/skel/.xscreensaver" 2>/dev/null | grep -q ".xscreensaver" || MISSING="$MISSING asset:xscreensaver-cfg"
             unsquashfs -ll _iso/live/filesystem.squashfs "usr/bin/xscreensaver" 2>/dev/null | grep -q "usr/bin/xscreensaver" || MISSING="$MISSING pkg:xscreensaver"
+            # animated spinning-shield banner
+            unsquashfs -ll _iso/live/filesystem.squashfs "usr/bin/aegis-fetch" 2>/dev/null | grep -q "usr/bin/aegis-fetch" || MISSING="$MISSING pkg:aegis-fetch"
             if [ -n "$MISSING" ]; then echo "PAYLOAD CHECK FAILED — missing from image:$MISSING"; exit 1; fi
             echo "payload check OK: aegis helpers + packaged friendly layer present in image"
           else

@@ -1,0 +1,147 @@
+#!/usr/bin/python3
+# aegis-fetch — the Aegis system banner. Plays a short animated "spinning shield"
+# (a coin-flip Y-axis rotation of the Aegis shield, in truecolor ANSI) and then
+# hands off to fastfetch for the usual system info. fastfetch itself renders once
+# and can't animate, so the spin lives here; the final frame resolves into the
+# normal fastfetch output.
+#
+# On a non-interactive stdout (a pipe/redirect), or with --no-spin, it skips the
+# animation and just runs fastfetch.
+import math
+import os
+import shutil
+import sys
+import time
+
+LOGO = "/etc/aegis/aegis-logo.txt"
+FF_CONFIG = "/etc/fastfetch/aegis.jsonc"
+TEAL = (45, 212, 191)
+
+# Fallback shield (used if the logo file is missing); same shape as the logo.
+FALLBACK = [
+    "        ▟▓▓▓▓▓▓▓▓▓▓▌",
+    "      ▟▓▓▓▓▓▓▓▓▓▓▓▓▓▌",
+    "     ▐▓▓▓▓▓▟██▙▓▓▓▓▓▌",
+    "     ▐▓▓▓▓▟████▙▓▓▓▓▌",
+    "     ▐▓▓▓▟██▛▜██▙▓▓▓▌",
+    "     ▐▓▓▟███▄▄███▙▓▓▌",
+    "     ▐▓▟██▛▀▀▀▀▜██▙▓▌",
+    "      ▜██▛▓▓▓▓▓▓▜██▛",
+    "       ▜▓▓▓▓▓▓▓▓▓▓▛",
+    "        ▜▓▓▓▓▓▓▓▓▛",
+    "          ▜▓▓▓▓▛",
+    "            ▜▓▛",
+]
+
+
+def load_shield():
+    rows = []
+    try:
+        with open(LOGO, encoding="utf-8") as f:
+            for line in f:
+                line = line.replace("$1", "").replace("$2", "").rstrip("\n")
+                # stop at the "A E G I S" wordmark / blank tail — spin the shield only
+                if line.strip() and "A E G I S" not in line and any(
+                        ch not in " " for ch in line):
+                    if "█" in line or "▓" in line or "▟" in line or "▙" in line \
+                            or "▛" in line or "▜" in line or "▌" in line or "▐" in line:
+                        rows.append(line)
+    except OSError:
+        rows = []
+    if not rows:
+        rows = FALLBACK[:]
+    w = max(len(r) for r in rows)
+    return [r.ljust(w) for r in rows], w
+
+
+def content_axis(rows, w):
+    lo, hi = w, 0
+    for r in rows:
+        s = r.rstrip()
+        if not s.strip():
+            continue
+        first = len(r) - len(r.lstrip(" "))
+        last = len(s) - 1
+        lo = min(lo, first)
+        hi = max(hi, last)
+    return (lo + hi) / 2.0 if hi >= lo else w / 2.0
+
+
+def paint(rows, w, axis, cos_t):
+    """One frame: horizontally squash the shield by |cos_t| around its axis."""
+    s = abs(cos_t)
+    bright = 0.45 + 0.55 * s           # dim toward edge-on for a 3D feel
+    r, g, b = (int(c * bright) for c in TEAL)
+    pre = f"\033[38;2;{r};{g};{b}m"
+    out = []
+    if s < 0.13:                        # edge-on: a thin vertical sliver
+        c = int(round(axis))
+        for row in rows:
+            line = [" "] * w
+            if row.strip():
+                line[min(max(c, 0), w - 1)] = "▏"
+            out.append(pre + "".join(line) + "\033[0m\033[K")
+        return out
+    for row in rows:
+        line = [" "] * w
+        for x in range(w):
+            u = axis + (x - axis) / s
+            ui = int(round(u))
+            if 0 <= ui < w and row[ui] != " ":
+                line[x] = row[ui]
+        out.append(pre + "".join(line) + "\033[0m\033[K")
+    return out
+
+
+def spin(rows, w, axis):
+    n = len(rows)
+    sys.stdout.write("\033[?25l")       # hide cursor
+    sys.stdout.flush()
+    try:
+        theta = 0.0
+        first = True
+        # ~2.3 turns, decelerating slightly, then settle facing front.
+        while theta < 4 * math.pi:
+            frame = paint(rows, w, axis, math.cos(theta))
+            if not first:
+                sys.stdout.write(f"\033[{n}A")
+            sys.stdout.write("".join(fr + "\n" for fr in frame))
+            sys.stdout.flush()
+            first = False
+            time.sleep(0.03)
+            theta += 0.34 + theta * 0.01
+        # erase the animation block so fastfetch can draw the real banner
+        sys.stdout.write(f"\033[{n}A\033[J")
+    finally:
+        sys.stdout.write("\033[?25h")   # show cursor
+        sys.stdout.flush()
+
+
+def run_fastfetch():
+    if shutil.which("fastfetch"):
+        args = ["fastfetch"]
+        if os.path.exists(FF_CONFIG):
+            args += ["--config", FF_CONFIG]
+        os.execvp("fastfetch", args)    # replaces this process
+    # no fastfetch: just show the static shield
+    try:
+        with open(LOGO, encoding="utf-8") as f:
+            txt = f.read().replace("$1", "\033[38;2;45;212;191m").replace("$2", "\033[36m")
+        sys.stdout.write(txt + "\033[0m\n")
+    except OSError:
+        pass
+
+
+def main():
+    no_spin = "--no-spin" in sys.argv or not sys.stdout.isatty()
+    if not no_spin:
+        rows, w = load_shield()
+        try:
+            spin(rows, w, content_axis(rows, w))
+        except (KeyboardInterrupt, OSError):
+            sys.stdout.write("\033[?25h")
+    run_fastfetch()
+
+
+if __name__ == "__main__":
+    main()
