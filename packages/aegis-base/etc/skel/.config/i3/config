@@ -1,0 +1,121 @@
+# Aegis i3 config. Shipped so i3 is usable out of the box (no first-run wizard,
+# which also keeps the live session amnesic) and — the point here — so the Aegis
+# wallpaper shows under i3 like it does under XFCE/GNOME/KDE.
+
+set $mod Mod4
+
+# Font for window titles and the bar.
+font pango:DejaVu Sans Mono 10
+
+# --- Aegis session bits -----------------------------------------------------
+# Paint the Aegis wallpaper every (re)start. The helper uses feh under i3.
+exec_always --no-startup-id /usr/lib/aegis/aegis-set-wallpaper
+# Screen locker / screensaver, if installed.
+exec --no-startup-id sh -c 'command -v xscreensaver >/dev/null && xscreensaver --no-splash &'
+# NetworkManager tray applet, if installed.
+exec --no-startup-id sh -c 'command -v nm-applet >/dev/null && nm-applet &'
+
+# Use Mouse+$mod to drag floating windows.
+floating_modifier $mod
+tiling_drag modifier titlebar
+
+# --- Launchers --------------------------------------------------------------
+bindsym $mod+Return exec xfce4-terminal
+bindsym $mod+Shift+q kill
+bindsym $mod+d exec --no-startup-id dmenu_run
+
+# --- Focus ------------------------------------------------------------------
+bindsym $mod+Left focus left
+bindsym $mod+Down focus down
+bindsym $mod+Up focus up
+bindsym $mod+Right focus right
+
+# --- Move -------------------------------------------------------------------
+bindsym $mod+Shift+Left move left
+bindsym $mod+Shift+Down move down
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Right move right
+
+# --- Layout -----------------------------------------------------------------
+bindsym $mod+h split h
+bindsym $mod+v split v
+bindsym $mod+f fullscreen toggle
+bindsym $mod+s layout stacking
+bindsym $mod+w layout tabbed
+bindsym $mod+e layout toggle split
+bindsym $mod+Shift+space floating toggle
+bindsym $mod+space focus mode_toggle
+bindsym $mod+a focus parent
+
+# --- Workspaces -------------------------------------------------------------
+set $ws1 "1"
+set $ws2 "2"
+set $ws3 "3"
+set $ws4 "4"
+set $ws5 "5"
+set $ws6 "6"
+set $ws7 "7"
+set $ws8 "8"
+set $ws9 "9"
+set $ws10 "10"
+
+bindsym $mod+1 workspace number $ws1
+bindsym $mod+2 workspace number $ws2
+bindsym $mod+3 workspace number $ws3
+bindsym $mod+4 workspace number $ws4
+bindsym $mod+5 workspace number $ws5
+bindsym $mod+6 workspace number $ws6
+bindsym $mod+7 workspace number $ws7
+bindsym $mod+8 workspace number $ws8
+bindsym $mod+9 workspace number $ws9
+bindsym $mod+0 workspace number $ws10
+
+bindsym $mod+Shift+1 move container to workspace number $ws1
+bindsym $mod+Shift+2 move container to workspace number $ws2
+bindsym $mod+Shift+3 move container to workspace number $ws3
+bindsym $mod+Shift+4 move container to workspace number $ws4
+bindsym $mod+Shift+5 move container to workspace number $ws5
+bindsym $mod+Shift+6 move container to workspace number $ws6
+bindsym $mod+Shift+7 move container to workspace number $ws7
+bindsym $mod+Shift+8 move container to workspace number $ws8
+bindsym $mod+Shift+9 move container to workspace number $ws9
+bindsym $mod+Shift+0 move container to workspace number $ws10
+
+# --- Session ----------------------------------------------------------------
+bindsym $mod+Shift+c reload
+bindsym $mod+Shift+r restart
+bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit i3?' -B 'Yes, exit i3' 'i3-msg exit'"
+
+# --- Resize mode ------------------------------------------------------------
+mode "resize" {
+        bindsym Left  resize shrink width 10 px or 10 ppt
+        bindsym Down  resize grow height 10 px or 10 ppt
+        bindsym Up    resize shrink height 10 px or 10 ppt
+        bindsym Right resize grow width 10 px or 10 ppt
+        bindsym Return mode "default"
+        bindsym Escape mode "default"
+        bindsym $mod+r mode "default"
+}
+bindsym $mod+r mode "resize"
+
+# --- Bar --------------------------------------------------------------------
+# Aegis palette: deep navy bar, teal accents (matches the shield/wallpaper).
+bar {
+        status_command i3status
+        position top
+        colors {
+                background #0b1120
+                statusline #e5e7eb
+                separator  #2dd4bf
+                #                  border   bg       text
+                focused_workspace  #2dd4bf #0f2b36 #e6fffb
+                active_workspace   #334155 #1e293b #cbd5e1
+                inactive_workspace #0b1120 #0b1120 #64748b
+                urgent_workspace   #7f1d1d #991b1b #fee2e2
+        }
+}
+
+# Window border accents.
+client.focused          #2dd4bf #0f2b36 #e6fffb #2dd4bf   #2dd4bf
+client.unfocused        #0b1120 #0b1120 #64748b #0b1120   #0b1120
+client.focused_inactive #0b1120 #1e293b #cbd5e1 #0b1120   #0b1120

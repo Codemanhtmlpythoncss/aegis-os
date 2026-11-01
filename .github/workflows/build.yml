@@ -103,7 +103,7 @@ jobs:
           if [ -f _iso/live/filesystem.squashfs ]; then
             MISSING=""
             # live-build includes helpers (still in /usr/local/bin)
-            for s in aegis-hostname aegis-apply aegis-mac-spoof aegis-ramwipe aegis-tordate aegis-media-watchdog; do
+            for s in aegis-hostname aegis-apply aegis-mac-spoof aegis-ramwipe aegis-tordate aegis-media-watchdog aegis-dispvm; do
               unsquashfs -ll _iso/live/filesystem.squashfs "usr/local/bin/$s" 2>/dev/null | grep -q "usr/local/bin/$s" || MISSING="$MISSING local:$s"
             done
             # packaged backend (aegis-firewall now ships via the .deb at /usr/sbin)
@@ -120,6 +120,10 @@ jobs:
             unsquashfs -ll _iso/live/filesystem.squashfs "usr/bin/xscreensaver" 2>/dev/null | grep -q "usr/bin/xscreensaver" || MISSING="$MISSING pkg:xscreensaver"
             # animated spinning-shield banner
             unsquashfs -ll _iso/live/filesystem.squashfs "usr/bin/aegis-fetch" 2>/dev/null | grep -q "usr/bin/aegis-fetch" || MISSING="$MISSING pkg:aegis-fetch"
+            # desktop-aware wallpaper applier + i3 config (so the background is the
+            # same Aegis image under XFCE/GNOME/KDE/i3, not each DE's own default)
+            unsquashfs -ll _iso/live/filesystem.squashfs "usr/lib/aegis/aegis-set-wallpaper" 2>/dev/null | grep -q "aegis-set-wallpaper" || MISSING="$MISSING pkg:aegis-set-wallpaper"
+            unsquashfs -ll _iso/live/filesystem.squashfs "etc/skel/.config/i3/config" 2>/dev/null | grep -q "i3/config" || MISSING="$MISSING asset:i3-config"
             if [ -n "$MISSING" ]; then echo "PAYLOAD CHECK FAILED — missing from image:$MISSING"; exit 1; fi
             echo "payload check OK: aegis helpers + packaged friendly layer present in image"
           else

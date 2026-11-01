@@ -3,6 +3,7 @@ etc/modprobe.d/aegis-hardening.conf etc/modprobe.d/
 usr/lib/aegis/aegis-branding usr/lib/aegis/
 etc/fastfetch/aegis.jsonc etc/fastfetch/
 etc/skel/.config/fastfetch/config.jsonc etc/skel/.config/fastfetch/
+etc/skel/.config/i3/config etc/skel/.config/i3/
 etc/aegis/aegis-logo.txt etc/aegis/
 usr/bin/aegis-fetch usr/bin/
 usr/lib/aegis/aegis-set-wallpaper usr/lib/aegis/

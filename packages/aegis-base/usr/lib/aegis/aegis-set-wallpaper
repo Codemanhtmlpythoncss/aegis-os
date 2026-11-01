@@ -1,55 +1,101 @@
 #!/bin/sh
-# Apply the Aegis wallpaper to every XFCE backdrop, reliably. Run from autostart.
-#
-# The bug this fixes: setting only /last-image is NOT enough — xfdesktop ignores
-# the image unless /image-style is a real display mode (5 = zoomed/fill). On a
-# fresh live session no image-style property exists, so the picture never shows
-# and you get the stock Greybird wallpaper. We also poll, because xfdesktop can
-# (re)create its backdrop properties a moment after login, and reload it at the
-# end so the change is picked up immediately.
+# Apply the Aegis wallpaper on whatever desktop is running. Run from autostart
+# (XFCE/GNOME/KDE) and from the i3 config. Each desktop stores its background
+# differently, so setting only XFCE's xfconf left GNOME/KDE/i3 on their own
+# default background — that's the "background differs per desktop" bug. We detect
+# the session and use its native mechanism, with `feh` painting the X root as a
+# universal fallback (i3, or any gap).
 IMG=/usr/share/backgrounds/aegis/aegis-wallpaper.png
 [ -f "$IMG" ] || exit 0
-command -v xfconf-query >/dev/null 2>&1 || exit 0
-CH=xfce4-desktop
 
-setprop() { # path  type  value   (set if present, else create)
-    xfconf-query -c "$CH" -p "$1" -s "$3" 2>/dev/null \
-        || xfconf-query -c "$CH" -n -t "$2" -p "$1" -s "$3" 2>/dev/null
-}
-
-apply() {
-    # Every backdrop xfdesktop already knows about: set our image + a real style.
-    for p in $(xfconf-query -c "$CH" -l 2>/dev/null | grep -E '/last-image$'); do
-        base=${p%/last-image}
-        setprop "$p"                string "$IMG"
-        setprop "$base/image-style" int    5
-        setprop "$base/image-show"  bool   true
-        setprop "$base/color-style" int    0
-    done
-    # Belt and braces: pre-seed the usual monitor/workspace backdrops too (both
-    # the flat and the /workspace0 schema), so a backdrop xfdesktop spawns a
-    # moment later already has the image AND the style. Harmless for absent
-    # monitors — xfdesktop just ignores those.
-    for m in monitor0 monitor1 monitorVirtual-1 monitorVirtual-2 Virtual-1 \
-             monitoreDP-1 monitorHDMI-1 monitorHDMI-A-1 monitorDP-1 monitorLVDS-1 monitorVGA-1; do
-        for ws in "" /workspace0 /workspace1; do
-            b="/backdrop/screen0/$m$ws"
-            setprop "$b/last-image"  string "$IMG"
-            setprop "$b/image-style" int    5
+# ---- XFCE (xfconf) ----------------------------------------------------------
+apply_xfce() {
+    command -v xfconf-query >/dev/null 2>&1 || return 1
+    CH=xfce4-desktop
+    setp() { # path type value : set if present, else create
+        xfconf-query -c "$CH" -p "$1" -s "$3" 2>/dev/null \
+            || xfconf-query -c "$CH" -n -t "$2" -p "$1" -s "$3" 2>/dev/null
+    }
+    do_apply() {
+        # xfdesktop ignores /last-image unless /image-style is a real mode (5=zoom).
+        for p in $(xfconf-query -c "$CH" -l 2>/dev/null | grep -E '/last-image$'); do
+            base=${p%/last-image}
+            setp "$p"                string "$IMG"
+            setp "$base/image-style" int    5
+            setp "$base/image-show"  bool   true
+            setp "$base/color-style" int    0
         done
+        # Pre-seed the usual monitor/workspace backdrops too, so a backdrop
+        # xfdesktop spawns a moment later already has image + style.
+        for m in monitor0 monitor1 monitorVirtual-1 monitorVirtual-2 Virtual-1 \
+                 monitoreDP-1 monitorHDMI-1 monitorHDMI-A-1 monitorDP-1 monitorLVDS-1 monitorVGA-1; do
+            for ws in "" /workspace0 /workspace1; do
+                b="/backdrop/screen0/$m$ws"
+                setp "$b/last-image"  string "$IMG"
+                setp "$b/image-style" int    5
+            done
+        done
+    }
+    i=0
+    while [ "$i" -lt 12 ]; do
+        if xfconf-query -c "$CH" -l >/dev/null 2>&1; then
+            do_apply
+            xfconf-query -c "$CH" -l 2>/dev/null | grep -q '/last-image$' && break
+        fi
+        i=$((i + 1)); sleep 2
     done
+    do_apply
+    xfdesktop --reload 2>/dev/null || true
+    return 0
 }
 
-# Wait for the xfce4-desktop channel + backdrop props to exist, then apply.
-i=0
-while [ "$i" -lt 12 ]; do
-    if xfconf-query -c "$CH" -l >/dev/null 2>&1; then
-        apply
-        xfconf-query -c "$CH" -l 2>/dev/null | grep -q '/last-image$' && break
+# ---- GNOME / Cinnamon / MATE (gsettings) -----------------------------------
+apply_gnome() {
+    command -v gsettings >/dev/null 2>&1 || return 1
+    uri="file://$IMG"
+    ok=1
+    for sch in org.gnome.desktop.background org.cinnamon.desktop.background; do
+        if gsettings writable "$sch" picture-uri >/dev/null 2>&1; then
+            gsettings set "$sch" picture-uri      "$uri"  2>/dev/null || true
+            gsettings set "$sch" picture-uri-dark "$uri"  2>/dev/null || true
+            gsettings set "$sch" picture-options  'zoom'  2>/dev/null || true
+            # match the lock screen where that schema exists
+            gsettings set org.gnome.desktop.screensaver picture-uri "$uri" 2>/dev/null || true
+            ok=0
+        fi
+    done
+    # MATE keeps the filename unprefixed
+    if gsettings writable org.mate.background picture-filename >/dev/null 2>&1; then
+        gsettings set org.mate.background picture-filename "$IMG"   2>/dev/null || true
+        gsettings set org.mate.background picture-options  'zoom'   2>/dev/null || true
+        ok=0
     fi
-    i=$((i + 1))
-    sleep 2
-done
-apply
-xfdesktop --reload 2>/dev/null || true
+    return $ok
+}
+
+# ---- KDE Plasma -------------------------------------------------------------
+apply_kde() {
+    command -v plasma-apply-wallpaperimage >/dev/null 2>&1 || return 1
+    plasma-apply-wallpaperimage "$IMG" >/dev/null 2>&1 || return 1
+    return 0
+}
+
+# ---- Universal X fallback (i3 / anything else) ------------------------------
+apply_feh() {
+    command -v feh >/dev/null 2>&1 || return 1
+    [ -n "${DISPLAY:-}" ] || return 1
+    feh --no-fehbg --bg-fill "$IMG" >/dev/null 2>&1 || return 1
+    return 0
+}
+
+DE="${XDG_CURRENT_DESKTOP:-}${XDG_SESSION_DESKTOP:-}${DESKTOP_SESSION:-}"
+applied=1
+case "$DE" in
+    *[Xx][Ff][Cc][Ee]*)                 apply_xfce  && applied=0 ;;
+    *[Gg][Nn][Oo][Mm][Ee]*|*Cinnamon*|*MATE*|*mate*)  apply_gnome && applied=0 ;;
+    *KDE*|*[Pp]lasma*)                   apply_kde   && applied=0 ;;
+esac
+
+# i3 / generic session, or the native method was unavailable → paint the root.
+[ "$applied" -eq 0 ] || apply_feh || true
 exit 0

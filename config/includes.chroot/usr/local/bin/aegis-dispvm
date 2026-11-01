@@ -11,19 +11,44 @@ set -eu
 APP="${1:-xfce4-terminal}"
 [ $# -gt 0 ] && shift || true
 
+# xfce4-terminal normally hands its window off to an existing terminal server on
+# the session bus — which would escape the sandbox into your real session. Force
+# it to run standalone inside the jail.
+EXTRA=""
+case "$APP" in
+    *xfce4-terminal) EXTRA="--disable-server" ;;
+esac
+
 if command -v firejail >/dev/null 2>&1; then
-    # --private gives a tmpfs HOME discarded on exit; drop privileges/caps.
-    exec firejail --quiet --private --noroot --caps.drop=all --seccomp \
-         --disable-mnt --private-tmp "$APP" "$@"
+    # NOTE: --noprofile is deliberate. The distro default.profile's exec/private-bin
+    # handling fails on the live squashfs overlay (redirect_dir=on) with
+    # "no suitable executable found", so the sandbox never launches. We don't need
+    # it: --private already gives an EMPTY tmpfs home (nothing sensitive to hide),
+    # and we harden explicitly below.
+    #   --private        throwaway tmpfs HOME, discarded on exit
+    #   --noroot         new user ns, cannot gain root
+    #   --caps.drop=all  no capabilities
+    #   --seccomp        syscall filter
+    #   --disable-mnt    no access to /mnt, /media (mounted drives)
+    exec firejail --quiet --noprofile --private --noroot \
+         --caps.drop=all --seccomp --disable-mnt \
+         "$APP" $EXTRA "$@"
 fi
 
-# Fallback: bubblewrap with a tmpfs home and read-only system.
+# Fallback: bubblewrap with a tmpfs home and read-only system. We must expose the
+# X11 socket, the X cookie and the session bus or no GUI window can appear.
 TMP="$(mktemp -d /tmp/aegis-dispvm.XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT INT TERM
+UID_=$(id -u)
 exec bwrap \
     --ro-bind /usr /usr --ro-bind /etc /etc \
     --symlink usr/bin /bin --symlink usr/lib /lib --symlink usr/lib64 /lib64 \
-    --proc /proc --dev /dev --tmpfs /tmp \
+    --proc /proc --dev-bind /dev /dev --tmpfs /tmp \
+    --ro-bind-try /tmp/.X11-unix /tmp/.X11-unix \
     --bind "$TMP" "$HOME" --setenv HOME "$HOME" \
+    --ro-bind-try "${XAUTHORITY:-$HOME/.Xauthority}" "$HOME/.Xauthority" \
+    --setenv XAUTHORITY "$HOME/.Xauthority" \
+    --setenv DISPLAY "${DISPLAY:-:0}" \
+    --ro-bind-try "/run/user/$UID_/bus" "/run/user/$UID_/bus" \
     --unshare-user --unshare-pid --die-with-parent \
-    "$APP" "$@"
+    "$APP" $EXTRA "$@"

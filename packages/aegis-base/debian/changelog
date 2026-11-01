@@ -1,3 +1,17 @@
+aegis-base (1.3.1) trixie; urgency=medium
+
+  * FIX the background differing per desktop: the wallpaper was only applied on
+    XFCE (xfconf + an XFCE-only autostart), so GNOME, KDE Plasma and i3 each
+    showed their own default background. aegis-set-wallpaper is now desktop-aware
+    — XFCE via xfconf, GNOME/Cinnamon/MATE via gsettings, KDE via
+    plasma-apply-wallpaperimage, and feh paints the X root as a universal
+    fallback — and its autostart now runs on every desktop (OnlyShowIn dropped).
+  * Ship an i3 config in /etc/skel so i3 shows the Aegis wallpaper (via feh),
+    is usable out of the box, and skips its first-run wizard (keeps the live
+    session amnesic). Aegis navy/teal bar + border accents to match the shield.
+
+ -- Aegis OS <aegis@aegis-os.localdomain>  Sun, 01 Nov 2026 23:35:00 +0000
+
 aegis-base (1.3.0) trixie; urgency=medium
 
   * New Aegis wallpaper/screensaver image: a low-key field of glossy blue
