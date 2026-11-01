@@ -41,9 +41,37 @@ EOF
 }
 clear_i2p_proxy() { rm -f "$PROXY_ENV"; }
 
+# dnsmasq as the local resolver, forwarding to Tor's DNSPort. This is what makes
+# name resolution work under the fail-closed firewall: without it resolv.conf is
+# empty (or a stub the firewall blocks) and every lookup fails ("couldn't resolve
+# host"). It also backs domain split-tunnel (aegis-route-domain drops files in
+# aegis-bypass.d).
+ensure_tor_dns() {
+    if command -v dnsmasq >/dev/null 2>&1; then
+        mkdir -p /etc/dnsmasq.d/aegis-bypass.d
+        cat > /etc/dnsmasq.d/aegis.conf <<'EOF'
+# Aegis: resolve everything over Tor (Tor's DNSPort on 127.0.0.1:5353), with
+# split-DNS for bypassed domains (files in aegis-bypass.d, by aegis-route-domain).
+no-resolv
+listen-address=127.0.0.1
+bind-interfaces
+cache-size=1000
+server=127.0.0.1#5353
+conf-dir=/etc/dnsmasq.d/aegis-bypass.d
+EOF
+        # A distro stub resolver would fight us (and can't egress when fail-closed).
+        systemctl disable --now systemd-resolved 2>/dev/null || true
+        systemctl --no-block restart dnsmasq 2>/dev/null || systemctl --no-block start dnsmasq 2>/dev/null || true
+    fi
+    # Point the system at the local resolver (break any resolvconf symlink first).
+    [ -L /etc/resolv.conf ] && rm -f /etc/resolv.conf
+    printf 'nameserver 127.0.0.1\noptions edns0\n' > /etc/resolv.conf 2>/dev/null || true
+}
+
 apply_tor() {
     load_rules "$TOR_RULES"
     systemctl --no-block start tor@default.service 2>/dev/null || systemctl --no-block start tor 2>/dev/null || true
+    ensure_tor_dns
     clear_i2p_proxy
     echo "Firewall: TOR transparent mode (fail-closed). All traffic via Tor."
 }
@@ -63,6 +91,7 @@ apply_both() {
     nft insert rule inet aegis output_filter meta skuid "$(i2pd_uid)" accept 2>/dev/null || true
     systemctl --no-block start tor@default.service 2>/dev/null || systemctl --no-block start tor 2>/dev/null || true
     systemctl --no-block start i2pd 2>/dev/null || true
+    ensure_tor_dns
     clear_i2p_proxy
     echo "Firewall: BOTH. Tor transparent for everything; i2pd proxies on 127.0.0.1:4444/4447 for .i2p."
 }

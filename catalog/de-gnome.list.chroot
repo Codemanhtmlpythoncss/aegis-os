@@ -1,5 +1,6 @@
 # GNOME — heavier; offered but not recommended for the "lightweight" goal.
 gnome-core
+gnome-session-xsession
 gdm3
 gnome-terminal
 nautilus

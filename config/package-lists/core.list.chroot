@@ -19,7 +19,6 @@ nftables
 network-manager
 network-manager-gnome
 macchanger
-resolvconf
 rfkill
 wireless-tools
 iw
