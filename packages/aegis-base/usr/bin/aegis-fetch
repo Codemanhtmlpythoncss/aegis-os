@@ -1,15 +1,16 @@
 #!/usr/bin/python3
-# aegis-fetch — the Aegis system banner. Plays a short animated "spinning shield"
-# (a coin-flip Y-axis rotation of the Aegis shield, in truecolor ANSI) and then
-# hands off to fastfetch for the usual system info. fastfetch itself renders once
-# and can't animate, so the spin lives here; the final frame resolves into the
-# normal fastfetch output.
+# aegis-fetch — the Aegis system banner. Shows the system info with a continuously
+# spinning Aegis shield beside it (a coin-flip Y-axis rotation of the shield in
+# truecolor ANSI, dimming toward edge-on). The shield keeps spinning while the
+# info stays on screen; press any key (or Ctrl-C) to stop and drop back to the
+# prompt, leaving the banner in place.
 #
-# On a non-interactive stdout (a pipe/redirect), or with --no-spin, it skips the
-# animation and just runs fastfetch.
+# On a non-interactive stdout (a pipe/redirect) or with --no-spin, it skips the
+# animation and just runs fastfetch normally (static shield + info).
 import math
 import os
 import shutil
+import subprocess
 import sys
 import time
 
@@ -17,7 +18,10 @@ LOGO = "/etc/aegis/aegis-logo.txt"
 FF_CONFIG = "/etc/fastfetch/aegis.jsonc"
 TEAL = (45, 212, 191)
 
-# Fallback shield (used if the logo file is missing); same shape as the logo.
+# Pace: bigger STEP or smaller DELAY = faster. Tuned to a calm ~3s per rotation.
+STEP = 0.16
+DELAY = 0.07
+
 FALLBACK = [
     "        ▟▓▓▓▓▓▓▓▓▓▓▌",
     "      ▟▓▓▓▓▓▓▓▓▓▓▓▓▓▌",
@@ -40,12 +44,10 @@ def load_shield():
         with open(LOGO, encoding="utf-8") as f:
             for line in f:
                 line = line.replace("$1", "").replace("$2", "").rstrip("\n")
-                # stop at the "A E G I S" wordmark / blank tail — spin the shield only
-                if line.strip() and "A E G I S" not in line and any(
-                        ch not in " " for ch in line):
-                    if "█" in line or "▓" in line or "▟" in line or "▙" in line \
-                            or "▛" in line or "▜" in line or "▌" in line or "▐" in line:
-                        rows.append(line)
+                if "A E G I S" in line:
+                    continue
+                if any(c in line for c in "█▓▟▙▛▜▌▐▄▀"):
+                    rows.append(line)
     except OSError:
         rows = []
     if not rows:
@@ -62,25 +64,25 @@ def content_axis(rows, w):
             continue
         first = len(r) - len(r.lstrip(" "))
         last = len(s) - 1
-        lo = min(lo, first)
-        hi = max(hi, last)
+        lo, hi = min(lo, first), max(hi, last)
     return (lo + hi) / 2.0 if hi >= lo else w / 2.0
 
 
 def paint(rows, w, axis, cos_t):
-    """One frame: horizontally squash the shield by |cos_t| around its axis."""
+    """Squash the shield horizontally by |cos_t| around its axis. Returns a list
+    of ANSI strings (visual width w, no trailing clear-to-EOL)."""
     s = abs(cos_t)
-    bright = 0.45 + 0.55 * s           # dim toward edge-on for a 3D feel
+    bright = 0.45 + 0.55 * s
     r, g, b = (int(c * bright) for c in TEAL)
     pre = f"\033[38;2;{r};{g};{b}m"
     out = []
-    if s < 0.13:                        # edge-on: a thin vertical sliver
-        c = int(round(axis))
+    if s < 0.13:
+        c = min(max(int(round(axis)), 0), w - 1)
         for row in rows:
             line = [" "] * w
             if row.strip():
-                line[min(max(c, 0), w - 1)] = "▏"
-            out.append(pre + "".join(line) + "\033[0m\033[K")
+                line[c] = "▏"
+            out.append(pre + "".join(line) + "\033[0m")
         return out
     for row in rows:
         line = [" "] * w
@@ -89,32 +91,27 @@ def paint(rows, w, axis, cos_t):
             ui = int(round(u))
             if 0 <= ui < w and row[ui] != " ":
                 line[x] = row[ui]
-        out.append(pre + "".join(line) + "\033[0m\033[K")
+        out.append(pre + "".join(line) + "\033[0m")
     return out
 
 
-def spin(rows, w, axis):
-    n = len(rows)
-    sys.stdout.write("\033[?25l")       # hide cursor
-    sys.stdout.flush()
+def capture_info():
+    """System info lines (with ANSI) from fastfetch, logo suppressed."""
+    if not shutil.which("fastfetch"):
+        return []
+    args = ["fastfetch", "--logo", "none"]
+    if os.path.exists(FF_CONFIG):
+        args += ["--config", FF_CONFIG]
     try:
-        theta = 0.0
-        first = True
-        # ~2.3 turns, decelerating slightly, then settle facing front.
-        while theta < 4 * math.pi:
-            frame = paint(rows, w, axis, math.cos(theta))
-            if not first:
-                sys.stdout.write(f"\033[{n}A")
-            sys.stdout.write("".join(fr + "\n" for fr in frame))
-            sys.stdout.flush()
-            first = False
-            time.sleep(0.03)
-            theta += 0.34 + theta * 0.01
-        # erase the animation block so fastfetch can draw the real banner
-        sys.stdout.write(f"\033[{n}A\033[J")
-    finally:
-        sys.stdout.write("\033[?25h")   # show cursor
-        sys.stdout.flush()
+        r = subprocess.run(args, capture_output=True, text=True, timeout=15)
+        lines = r.stdout.split("\n")
+        while lines and not lines[0].strip():
+            lines.pop(0)
+        while lines and not lines[-1].strip():
+            lines.pop()
+        return lines
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def run_fastfetch():
@@ -122,8 +119,7 @@ def run_fastfetch():
         args = ["fastfetch"]
         if os.path.exists(FF_CONFIG):
             args += ["--config", FF_CONFIG]
-        os.execvp("fastfetch", args)    # replaces this process
-    # no fastfetch: just show the static shield
+        os.execvp("fastfetch", args)
     try:
         with open(LOGO, encoding="utf-8") as f:
             txt = f.read().replace("$1", "\033[38;2;45;212;191m").replace("$2", "\033[36m")
@@ -132,15 +128,67 @@ def run_fastfetch():
         pass
 
 
+def animate(rows, w, axis, info):
+    import select
+    gap = "   "
+    region = max(len(rows), len(info))
+    total = region + 1          # + a hint line
+    can_key = sys.stdin.isatty()
+    old = None
+    if can_key:
+        import termios
+        import tty
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
+        tty.setcbreak(fd)
+
+    def draw(cos_t, hint=True):
+        frame = paint(rows, w, axis, cos_t)
+        lines = []
+        for r in range(region):
+            shield = frame[r] if r < len(rows) else " " * w
+            text = info[r] if r < len(info) else ""
+            lines.append(shield + gap + text + "\033[K")
+        lines.append(("\033[2m   (press any key to stop)\033[0m\033[K") if hint else "\033[K")
+        return "\n".join(lines) + "\n"
+
+    sys.stdout.write("\033[?25l")
+    theta, first = 0.0, True
+    try:
+        while True:
+            if not first:
+                sys.stdout.write(f"\033[{total}A")
+            sys.stdout.write(draw(math.cos(theta)))
+            sys.stdout.flush()
+            first = False
+            theta += STEP
+            if can_key:
+                if select.select([sys.stdin], [], [], DELAY)[0]:
+                    os.read(sys.stdin.fileno(), 32)
+                    break
+            else:
+                time.sleep(DELAY)
+                if theta >= 8 * math.pi:     # no keyboard: ~4 turns then settle
+                    break
+    except KeyboardInterrupt:
+        pass
+    finally:
+        # settle on the front-facing shield, clear the hint, restore the cursor
+        sys.stdout.write(f"\033[{total}A")
+        sys.stdout.write(draw(1.0, hint=False))
+        sys.stdout.write("\033[?25h")
+        sys.stdout.flush()
+        if old is not None:
+            import termios
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old)
+
+
 def main():
-    no_spin = "--no-spin" in sys.argv or not sys.stdout.isatty()
-    if not no_spin:
-        rows, w = load_shield()
-        try:
-            spin(rows, w, content_axis(rows, w))
-        except (KeyboardInterrupt, OSError):
-            sys.stdout.write("\033[?25h")
-    run_fastfetch()
+    if "--no-spin" in sys.argv or not sys.stdout.isatty():
+        run_fastfetch()
+        return
+    rows, w = load_shield()
+    animate(rows, w, content_axis(rows, w), capture_info())
 
 
 if __name__ == "__main__":

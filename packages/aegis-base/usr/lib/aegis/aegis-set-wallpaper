@@ -1,28 +1,55 @@
 #!/bin/sh
-# Apply the Aegis wallpaper to every XFCE backdrop (per monitor/workspace),
-# whatever the monitor is called. Run from autostart in the user's session.
+# Apply the Aegis wallpaper to every XFCE backdrop, reliably. Run from autostart.
+#
+# The bug this fixes: setting only /last-image is NOT enough — xfdesktop ignores
+# the image unless /image-style is a real display mode (5 = zoomed/fill). On a
+# fresh live session no image-style property exists, so the picture never shows
+# and you get the stock Greybird wallpaper. We also poll, because xfdesktop can
+# (re)create its backdrop properties a moment after login, and reload it at the
+# end so the change is picked up immediately.
 IMG=/usr/share/backgrounds/aegis/aegis-wallpaper.png
 [ -f "$IMG" ] || exit 0
 command -v xfconf-query >/dev/null 2>&1 || exit 0
+CH=xfce4-desktop
 
-# Let xfdesktop create its backdrop properties first.
-sleep 4
+setprop() { # path  type  value   (set if present, else create)
+    xfconf-query -c "$CH" -p "$1" -s "$3" 2>/dev/null \
+        || xfconf-query -c "$CH" -n -t "$2" -p "$1" -s "$3" 2>/dev/null
+}
 
-props=$(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E '/last-image$')
-if [ -n "$props" ]; then
-    for p in $props; do
-        xfconf-query -c xfce4-desktop -p "$p" -s "$IMG" 2>/dev/null || true
+apply() {
+    # Every backdrop xfdesktop already knows about: set our image + a real style.
+    for p in $(xfconf-query -c "$CH" -l 2>/dev/null | grep -E '/last-image$'); do
+        base=${p%/last-image}
+        setprop "$p"                string "$IMG"
+        setprop "$base/image-style" int    5
+        setprop "$base/image-show"  bool   true
+        setprop "$base/color-style" int    0
     done
-else
-    # No backdrop props yet — create them for the usual monitor names.
-    for mon in monitorVirtual-1 monitor0 Virtual-1 monitorLVDS-1 monitorVGA-1 monitoreDP-1 monitorHDMI-1; do
-        xfconf-query -c xfce4-desktop -n -t string \
-            -p "/backdrop/screen0/$mon/workspace0/last-image" -s "$IMG" 2>/dev/null || true
+    # Belt and braces: pre-seed the usual monitor/workspace backdrops too (both
+    # the flat and the /workspace0 schema), so a backdrop xfdesktop spawns a
+    # moment later already has the image AND the style. Harmless for absent
+    # monitors — xfdesktop just ignores those.
+    for m in monitor0 monitor1 monitorVirtual-1 monitorVirtual-2 Virtual-1 \
+             monitoreDP-1 monitorHDMI-1 monitorHDMI-A-1 monitorDP-1 monitorLVDS-1 monitorVGA-1; do
+        for ws in "" /workspace0 /workspace1; do
+            b="/backdrop/screen0/$m$ws"
+            setprop "$b/last-image"  string "$IMG"
+            setprop "$b/image-style" int    5
+        done
     done
-fi
+}
 
-# Fill the screen (image-style 5 = zoomed) on any backdrop that has the setting.
-for p in $(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E '/image-style$'); do
-    xfconf-query -c xfce4-desktop -p "$p" -s 5 2>/dev/null || true
+# Wait for the xfce4-desktop channel + backdrop props to exist, then apply.
+i=0
+while [ "$i" -lt 12 ]; do
+    if xfconf-query -c "$CH" -l >/dev/null 2>&1; then
+        apply
+        xfconf-query -c "$CH" -l 2>/dev/null | grep -q '/last-image$' && break
+    fi
+    i=$((i + 1))
+    sleep 2
 done
+apply
+xfdesktop --reload 2>/dev/null || true
 exit 0

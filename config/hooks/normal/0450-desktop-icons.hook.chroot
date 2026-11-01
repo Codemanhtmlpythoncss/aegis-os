@@ -1,0 +1,22 @@
+#!/bin/sh
+# Put all the Aegis apps on the desktop: copy their launchers into /etc/skel/Desktop
+# so every live user gets desktop icons for them. Runs after packages are
+# installed, so the packaged apps' .desktop files (Control Center, Tor Connection,
+# Welcome, Switch Desktop, …) are present. xfdesktop shows ~/Desktop/*.desktop as
+# launchers when they're executable, so we chmod +x (same as install-aegis).
+set -e
+
+mkdir -p /etc/skel/Desktop
+
+# Every Aegis app launcher, plus the installer icon.
+for f in /usr/share/applications/aegis-*.desktop \
+         /usr/share/applications/install-aegis.desktop; do
+    [ -f "$f" ] && cp -f "$f" /etc/skel/Desktop/ || true
+done
+
+# Don't put pure background/helper entries on the desktop.
+rm -f /etc/skel/Desktop/aegis-wallpaper.desktop \
+      /etc/skel/Desktop/aegis-screensaver.desktop 2>/dev/null || true
+
+chmod +x /etc/skel/Desktop/*.desktop 2>/dev/null || true
+echo "I: seeded /etc/skel/Desktop with $(ls /etc/skel/Desktop/*.desktop 2>/dev/null | wc -l) Aegis launcher(s)"

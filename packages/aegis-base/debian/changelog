@@ -6,10 +6,17 @@ aegis-base (1.3.0) trixie; urgency=medium
     Aegis image, no lock) plus an autostart entry.
   * Stop running fastfetch at the start of every terminal (the old
     /etc/bash.bashrc auto-run hook is removed on upgrade).
-  * Add aegis-fetch: an animated "spinning shield" banner (a coin-flip rotation
-    of the Aegis shield in truecolor ANSI) that resolves into the normal
-    fastfetch system info. `fastfetch` / `fetch` are aliased to it in
-    interactive shells; `aegis-fetch --no-spin` gives the static banner.
+  * Add aegis-fetch: an animated "spinning shield" banner — the Aegis shield
+    does a coin-flip rotation (truecolor ANSI) and KEEPS spinning beside the
+    fastfetch system info until you press a key. `fastfetch` / `fetch` are
+    aliased to it in interactive shells; `aegis-fetch --no-spin` is static.
+  * FIX wallpaper not showing: xfdesktop ignores /last-image unless /image-style
+    is a real mode, and on a fresh session no image-style existed — so the stock
+    Greybird wallpaper showed instead of ours. aegis-set-wallpaper now sets
+    image-style (zoom), polls for the backdrop props, and reloads xfdesktop.
+  * Put all the Aegis apps on the desktop: a hook seeds /etc/skel/Desktop with
+    launchers for Control Center, Tor Connection, Welcome, Switch Desktop and
+    the installer.
 
  -- Aegis OS <aegis@aegis-os.localdomain>  Sun, 01 Nov 2026 17:49:24 +0000
 
