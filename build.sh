@@ -105,7 +105,7 @@ stage_payload() {
     done
     # Brand the visible menu text (both GRUB and isolinux).
     find config/bootloaders -name '*.cfg' -type f -exec \
-      sed -i 's/Live system/Aegis OS/g; s@Debian GNU/Linux@Aegis OS@g; s/Debian Live/Aegis OS/g' {} +
+      sed -i 's/Live system/Aegis OS/g; s@Debian GNU/Linux@Aegis OS@g; s/Debian Live/Aegis OS/g; s/\bDebian\b/Aegis/g' {} +
     echo "I: staged custom bootloaders (auto-boot timeout + Aegis branding)"
   else
     echo "W: live-build bootloader templates not at $BL_SRC; menu stays stock."
@@ -159,7 +159,9 @@ build_one() {
   # serial port (what the CI boot smoke-test reads). tty0 is also listed, so the
   # screen still shows the (verbose, no 'quiet splash') boot. No loglevel=0, so the
   # boot is actually visible.
-  local BOOTAPPEND="boot=live components console=tty0 console=$SERCON \
+  # live-config.user-fullname sets the live account's GECOS (shown in the XFCE
+  # panel / logout dialog) to "Aegis" instead of live-config's "Debian Live user".
+  local BOOTAPPEND="boot=live components live-config.user-fullname=Aegis console=tty0 console=$SERCON \
 init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 page_poison=1 slab_nomerge \
 randomize_kstack_offset=on vsyscall=none debugfs=off \
 lockdown=confidentiality mce=0 ipv6.disable=1 \

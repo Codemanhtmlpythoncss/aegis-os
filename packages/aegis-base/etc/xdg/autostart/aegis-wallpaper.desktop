@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Aegis wallpaper
+Comment=Apply the Aegis desktop background on login
+Exec=/usr/lib/aegis/aegis-set-wallpaper
+OnlyShowIn=XFCE;
+Terminal=false
+X-GNOME-Autostart-enabled=true
+NoDisplay=true

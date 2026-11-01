@@ -1,0 +1,28 @@
+#!/bin/sh
+# Apply the Aegis wallpaper to every XFCE backdrop (per monitor/workspace),
+# whatever the monitor is called. Run from autostart in the user's session.
+IMG=/usr/share/backgrounds/aegis/aegis-wallpaper.png
+[ -f "$IMG" ] || exit 0
+command -v xfconf-query >/dev/null 2>&1 || exit 0
+
+# Let xfdesktop create its backdrop properties first.
+sleep 4
+
+props=$(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E '/last-image$')
+if [ -n "$props" ]; then
+    for p in $props; do
+        xfconf-query -c xfce4-desktop -p "$p" -s "$IMG" 2>/dev/null || true
+    done
+else
+    # No backdrop props yet — create them for the usual monitor names.
+    for mon in monitorVirtual-1 monitor0 Virtual-1 monitorLVDS-1 monitorVGA-1 monitoreDP-1 monitorHDMI-1; do
+        xfconf-query -c xfce4-desktop -n -t string \
+            -p "/backdrop/screen0/$mon/workspace0/last-image" -s "$IMG" 2>/dev/null || true
+    done
+fi
+
+# Fill the screen (image-style 5 = zoomed) on any backdrop that has the setting.
+for p in $(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E '/image-style$'); do
+    xfconf-query -c xfce4-desktop -p "$p" -s 5 2>/dev/null || true
+done
+exit 0

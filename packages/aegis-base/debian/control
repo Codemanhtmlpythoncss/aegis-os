@@ -10,7 +10,7 @@ Rules-Requires-Root: no
 Package: aegis-base
 Architecture: all
 Depends: ${misc:Depends}, apparmor, apparmor-profiles
-Recommends: apparmor-profiles-extra
+Recommends: apparmor-profiles-extra, fastfetch
 Description: Aegis OS base integration and kernel hardening
  Core Aegis OS integration installed on every Aegis system:
   * conservative kernel hardening via sysctl (kptr/dmesg restrict, ptrace

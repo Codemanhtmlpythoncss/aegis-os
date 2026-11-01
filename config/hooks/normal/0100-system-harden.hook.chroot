@@ -18,7 +18,7 @@ echo "UTC" > /etc/timezone
 # Fixes the login banner and, on installed systems, the GRUB menu title
 # (grub-mkconfig/os-prober use PRETTY_NAME).
 if [ -f /etc/os-release ]; then
-    sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Aegis OS (Debian trixie)"/' /etc/os-release || true
+    sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Aegis OS"/' /etc/os-release || true
     sed -i 's/^NAME=.*/NAME="Aegis OS"/' /etc/os-release || true
     grep -q '^PRETTY_NAME=' /etc/os-release || echo 'PRETTY_NAME="Aegis OS"' >> /etc/os-release
 fi

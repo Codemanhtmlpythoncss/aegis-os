@@ -60,6 +60,7 @@ htop
 pciutils
 usbutils
 console-setup
+fastfetch
 
 # --- Aegis control apps need these ---
 python3

@@ -9,7 +9,7 @@ ConditionPathExists=/run/live/medium
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'u=user; id "$u" >/dev/null 2>&1 || exit 0; echo "$u:live" | chpasswd; usermod -aG sudo "$u" 2>/dev/null || true; getent group autologin >/dev/null 2>&1 && usermod -aG autologin "$u" 2>/dev/null || true; echo "aegis: set password for $u to live"; true'
+ExecStart=/bin/sh -c 'u=user; id "$u" >/dev/null 2>&1 || exit 0; echo "$u:live" | chpasswd; usermod -aG sudo "$u" 2>/dev/null || true; getent group autologin >/dev/null 2>&1 && usermod -aG autologin "$u" 2>/dev/null || true; chfn -f Aegis "$u" 2>/dev/null || usermod -c Aegis "$u" 2>/dev/null || true; echo "aegis: set password for $u to live"; true'
 
 [Install]
 WantedBy=multi-user.target
