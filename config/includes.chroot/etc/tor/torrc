@@ -17,6 +17,15 @@ VirtualAddrNetworkIPv4 10.192.0.0/10
 # Stream isolation hardening.
 SafeSocks 1
 
+# Control port for the Aegis Control Center (bootstrap %, new circuit). Cookie
+# auth, group-readable so the live user (in the debian-tor group) can query it.
+ControlPort 127.0.0.1:9051
+CookieAuthentication 1
+CookieAuthFileGroupReadable 1
+
+# Managed add-ons written by the Control Center (e.g. bridges).
+%include /etc/tor/torrc.d/*.conf
+
 # Pluggable transports available if your network blocks Tor (enable in wizard):
 #ClientTransportPlugin obfs4 exec /usr/bin/obfs4proxy
 #UseBridges 1

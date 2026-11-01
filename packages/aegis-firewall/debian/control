@@ -10,8 +10,8 @@ Rules-Requires-Root: no
 Package: aegis-firewall
 Architecture: all
 Depends: ${misc:Depends}, nftables, iproute2
-Recommends: tor
-Suggests: i2pd
+Recommends: tor, i2pd, dnsmasq, wireguard-tools, openvpn, obfs4proxy
+Suggests: resolvconf
 Description: Aegis OS fail-closed firewall and network-mode switcher
  Provides /usr/sbin/aegis-firewall and the aegis-netmode service, which apply the
  selected network mode at boot and on demand:

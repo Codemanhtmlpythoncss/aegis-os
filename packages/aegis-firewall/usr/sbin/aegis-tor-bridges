@@ -1,0 +1,18 @@
+#!/bin/sh
+# aegis-tor-bridges — write the Tor bridges drop-in and reconnect. Root only.
+# Driven by the Control Center's Tor page.
+# Usage: aegis-tor-bridges save '<torrc snippet>'  |  clear
+set -eu
+
+DROPIN=/etc/tor/torrc.d/10-aegis-bridges.conf
+mkdir -p /etc/tor/torrc.d
+[ "$(id -u)" = 0 ] || { echo "aegis-tor-bridges: must run as root" >&2; exit 1; }
+
+case "${1:-}" in
+    save)  printf '%s\n' "${2:-}" > "$DROPIN" ;;
+    clear) : > "$DROPIN" ;;
+    *)     echo "usage: aegis-tor-bridges {save <content>|clear}" >&2; exit 2 ;;
+esac
+
+systemctl restart tor@default.service 2>/dev/null || systemctl restart tor 2>/dev/null || true
+echo "tor bridges updated"

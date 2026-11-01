@@ -1,6 +1,9 @@
 usr/sbin/aegis-firewall usr/sbin/
 usr/sbin/aegis-netmode-set usr/sbin/
 usr/sbin/aegis-route usr/sbin/
+usr/sbin/aegis-route-domain usr/sbin/
+usr/sbin/aegis-vpn usr/sbin/
+usr/sbin/aegis-tor-bridges usr/sbin/
 usr/bin/aegis-run-clearnet usr/bin/
 etc/aegis/nftables-tor.conf etc/aegis/
 etc/aegis/nftables-i2p.conf etc/aegis/

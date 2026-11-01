@@ -71,6 +71,9 @@ systemctl enable tor@default.service 2>/dev/null || systemctl enable tor 2>/dev/
 systemctl enable i2pd 2>/dev/null || true
 # Don't let nftables service fight aegis-firewall; aegis-netmode owns the ruleset.
 systemctl disable nftables 2>/dev/null || true
+# dnsmasq is off until the user bypasses a site (aegis-route-domain turns it on),
+# so the default DNS path (Tor DNSPort via the firewall) stays simple.
+systemctl disable dnsmasq 2>/dev/null || true
 
 # --- RAM wipe on shutdown ---
 if [ "$AEGIS_RAM_WIPE" = yes ]; then

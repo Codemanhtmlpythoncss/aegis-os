@@ -23,6 +23,11 @@ resolvconf
 rfkill
 wireless-tools
 iw
+# split-tunnel DNS (domain bypass) + VPN support + Tor pluggable transport
+dnsmasq
+wireguard-tools
+openvpn
+obfs4proxy
 
 # --- sandboxing & mandatory access control ---
 firejail

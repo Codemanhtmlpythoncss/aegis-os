@@ -1,0 +1,69 @@
+#!/bin/sh
+# aegis-route-domain — split-tunnel specific SITES (domains) out of the Tor/I2P
+# tunnel. It makes a local dnsmasq resolve the chosen domains to their REAL IPs
+# (via a clearnet resolver) and pin those IPs DIRECT in the firewall, while every
+# other name keeps resolving through Tor (automap). Root only.
+#
+# dnsmasq is only activated the first time you bypass a domain, so the default
+# system (no site bypasses) keeps its simple Tor DNS path untouched.
+# Usage: aegis-route-domain {list|add <domain>|del <domain>}
+set -eu
+
+[ "$(id -u)" = 0 ] || { echo "aegis-route-domain: must run as root" >&2; exit 1; }
+BYPASS_DIR=/etc/dnsmasq.d/aegis-bypass.d
+UPSTREAM=/etc/dnsmasq.d/aegis.conf
+mkdir -p "$BYPASS_DIR"
+
+ensure_dnsmasq() {
+    command -v dnsmasq >/dev/null 2>&1 || { echo "dnsmasq is not installed" >&2; exit 1; }
+    if [ ! -f "$UPSTREAM" ]; then
+        cat > "$UPSTREAM" <<EOF
+# Aegis local resolver. Normal names -> Tor's DNSPort (automap -> routed via Tor);
+# bypassed domains (aegis-bypass.d/*) -> real resolver, pinned DIRECT.
+listen-address=127.0.0.1
+bind-interfaces
+no-resolv
+no-hosts
+cache-size=1000
+server=127.0.0.1#5353
+conf-dir=/etc/dnsmasq.d/aegis-bypass.d
+EOF
+    fi
+    systemctl disable --now systemd-resolved 2>/dev/null || true
+    mkdir -p /etc/NetworkManager/conf.d
+    printf '[main]\ndns=none\n' > /etc/NetworkManager/conf.d/90-aegis-dns.conf
+    rm -f /etc/resolv.conf 2>/dev/null || true
+    printf 'nameserver 127.0.0.1\n' > /etc/resolv.conf
+    systemctl reload-or-restart NetworkManager 2>/dev/null || true
+    systemctl enable --now dnsmasq 2>/dev/null || systemctl restart dnsmasq 2>/dev/null || true
+    # Let dnsmasq reach its upstreams (Tor DNSPort on loopback + the bypass resolver).
+    u=$(id -u dnsmasq 2>/dev/null || echo 0)
+    nft insert rule inet aegis output_nat    meta skuid "$u" accept 2>/dev/null || true
+    nft insert rule inet aegis output_filter meta skuid "$u" accept 2>/dev/null || true
+}
+
+case "${1:-list}" in
+    list)
+        ls -1 "$BYPASS_DIR" 2>/dev/null | sed 's/\.conf$//' | sort -u ;;
+    add)
+        d="${2:?usage: aegis-route-domain add <domain>}"
+        case "$d" in *[!a-zA-Z0-9.-]*|"") echo "invalid domain: $d" >&2; exit 2 ;; esac
+        ensure_dnsmasq
+        cat > "$BYPASS_DIR/$d.conf" <<EOF
+server=/$d/1.1.1.1
+server=/$d/9.9.9.9
+nftset=/$d/4#inet#aegis#bypass4
+nftset=/$d/6#inet#aegis#bypass6
+EOF
+        systemctl reload-or-restart dnsmasq 2>/dev/null || systemctl restart dnsmasq 2>/dev/null || true
+        echo "site bypass added: $d"
+        ;;
+    del|rm|remove)
+        d="${2:?usage: aegis-route-domain del <domain>}"
+        rm -f "$BYPASS_DIR/$d.conf"
+        systemctl reload-or-restart dnsmasq 2>/dev/null || true
+        echo "site bypass removed: $d"
+        ;;
+    *)
+        echo "usage: aegis-route-domain {list|add <domain>|del <domain>}" >&2; exit 2 ;;
+esac

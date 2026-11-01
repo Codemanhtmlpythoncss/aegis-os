@@ -67,6 +67,32 @@ apply_both() {
     echo "Firewall: BOTH. Tor transparent for everything; i2pd proxies on 127.0.0.1:4444/4447 for .i2p."
 }
 
+apply_vpn() {
+    local gid; gid=$(clearnet_gid)
+    # Kill-switch: only the VPN tunnel interface (+ handshake to bring it up, and
+    # the split-tunnel escapes) may egress. If the tunnel drops, traffic is cut.
+    nft -f - <<EOF
+flush ruleset
+table inet aegis {
+  set bypass4 { type ipv4_addr; flags interval; }
+  set bypass6 { type ipv6_addr; flags interval; }
+  chain input  { type filter hook input priority 0; policy drop;
+                 ct state established,related accept; iif "lo" accept;
+                 iifname {"wg0","wg1","tun0","tun1"} accept; }
+  chain output { type filter hook output priority 0; policy drop;
+                 ct state established,related accept; oif "lo" accept;
+                 oifname {"wg0","wg1","tun0","tun1"} accept;
+                 meta skgid $gid accept;
+                 ip daddr @bypass4 accept; ip6 daddr @bypass6 accept;
+                 udp dport 51820 accept;
+                 udp dport {1194,1195} accept; tcp dport {1194,443} accept; }
+  chain forward { type filter hook forward priority 0; policy drop; }
+}
+EOF
+    clear_i2p_proxy
+    echo "Firewall: VPN kill-switch. Only the VPN tunnel (+ handshake) may reach the network."
+}
+
 apply_direct() {
     nft -f - <<'EOF'
 flush ruleset
@@ -85,6 +111,7 @@ case "${1:-status}" in
     tor)    apply_tor ;;
     i2p)    apply_i2p ;;
     both)   apply_both ;;
+    vpn)    apply_vpn ;;
     direct) apply_direct ;;
     status) nft list ruleset ;;
     *) die "usage: aegis-firewall {tor|i2p|both|direct|status}" ;;

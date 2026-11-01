@@ -1,0 +1,65 @@
+#!/bin/sh
+# aegis-vpn — import and control custom VPNs (WireGuard .conf / OpenVPN .ovpn).
+# Root only; driven by the Aegis Control Center. Configs live in /etc/aegis/vpn.
+# Usage: aegis-vpn {import <file>|list|up <name>|down <name>|remove <name>|active|mode <name>}
+set -eu
+
+VPN_DIR=/etc/aegis/vpn
+RUN=/run/aegis
+STATE="$RUN/vpn.active"
+mkdir -p "$VPN_DIR" "$RUN"
+[ "$(id -u)" = 0 ] || { echo "aegis-vpn: must run as root" >&2; exit 1; }
+
+cfg_of() {
+    for e in conf ovpn; do [ -f "$VPN_DIR/$1.$e" ] && { echo "$VPN_DIR/$1.$e"; return 0; }; done
+    return 1
+}
+
+do_down() {
+    n="${1:-}"; [ -n "$n" ] || return 0
+    c=$(cfg_of "$n" 2>/dev/null || true)
+    case "$c" in
+        *.conf) wg-quick down "$n" 2>/dev/null || true ;;
+        *.ovpn) { [ -f "$RUN/ovpn-$n.pid" ] && kill "$(cat "$RUN/ovpn-$n.pid")" 2>/dev/null; } || pkill -f "aegis-ovpn-$n" 2>/dev/null || true ;;
+    esac
+    rm -f "$RUN/ovpn-$n.pid"
+    [ "$(cat "$STATE" 2>/dev/null || true)" = "$n" ] && rm -f "$STATE" || true
+}
+
+do_up() {
+    n="$1"; c=$(cfg_of "$n") || { echo "no such vpn: $n" >&2; exit 1; }
+    do_down "$(cat "$STATE" 2>/dev/null || true)" || true
+    case "$c" in
+        *.conf)
+            mkdir -p /etc/wireguard
+            install -m 0600 "$c" /etc/wireguard/"$n".conf
+            wg-quick up "$n" ;;
+        *.ovpn)
+            openvpn --config "$c" --daemon "aegis-ovpn-$n" \
+                    --writepid "$RUN/ovpn-$n.pid" --log "$RUN/ovpn-$n.log" ;;
+    esac
+    echo "$n" > "$STATE"
+    echo "vpn up: $n"
+}
+
+case "${1:-list}" in
+    import)
+        f="${2:?usage: aegis-vpn import <file>}"
+        base=$(basename "$f")
+        case "$base" in
+            *.conf|*.ovpn) install -D -m 0600 "$f" "$VPN_DIR/$base"; echo "imported $base" ;;
+            *) echo "need a WireGuard .conf or OpenVPN .ovpn file" >&2; exit 2 ;;
+        esac ;;
+    list)
+        ls -1 "$VPN_DIR" 2>/dev/null | sed -e 's/\.conf$//' -e 's/\.ovpn$//' | sort -u ;;
+    active)
+        cat "$STATE" 2>/dev/null || true ;;
+    up)     do_up "${2:?name}" ;;
+    down)   do_down "${2:?name}" ;;
+    remove) do_down "${2:?name}" || true; rm -f "$VPN_DIR/$2.conf" "$VPN_DIR/$2.ovpn"; echo "removed $2" ;;
+    mode)
+        do_up "${2:?name}"
+        echo vpn > /etc/aegis/netmode
+        aegis-firewall vpn ;;
+    *) echo "usage: aegis-vpn {import <file>|list|up <name>|down <name>|remove <name>|active|mode <name>}" >&2; exit 2 ;;
+esac

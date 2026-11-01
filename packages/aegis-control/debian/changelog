@@ -2,5 +2,9 @@ aegis-control (1.2.0) trixie; urgency=medium
 
   * Initial release: GTK Control Center — network-mode switcher, live
     Tor/I2P/firewall status, MAC spoofing, update check and panic wipe.
+  * Rebuilt as a full sidebar app: Status, Tor (Tails-style bootstrap %, connect,
+    new circuit, obfs4/meek bridges), I2P (status, console, start/stop), VPN
+    (import/connect WireGuard + OpenVPN, VPN kill-switch mode) and Split-tunnel
+    (exclude apps, sites/domains and IPs from the tunnel).
 
  -- Aegis OS <aegis@aegis-os.localdomain>  Sat, 01 Nov 2026 10:05:00 +0000

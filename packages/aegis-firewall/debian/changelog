@@ -13,5 +13,12 @@ aegis-firewall (1.2.0) trixie; urgency=medium
     outside the tunnel). postinst creates the aegis-clearnet group (gid 700).
   * I2P "everything" mode: fail-closed ruleset (nftables-i2p.conf) where only
     i2pd egresses, plus a system HTTP-proxy drop-in to the I2P proxy.
+  * VPN: aegis-vpn imports/controls WireGuard (.conf) and OpenVPN (.ovpn); a new
+    'vpn' firewall mode is a kill-switch (only the tunnel + handshake egress).
+  * Split-tunnel by SITE: aegis-route-domain uses an opt-in local dnsmasq to
+    resolve chosen domains to real IPs (pinned direct) while everything else
+    still resolves through Tor.
+  * aegis-tor-bridges manages obfs4/meek bridges; torrc gains a control port so
+    the Control Center can show live bootstrap progress and request new circuits.
 
  -- Aegis OS <aegis@aegis-os.localdomain>  Sat, 01 Nov 2026 09:40:00 +0000
