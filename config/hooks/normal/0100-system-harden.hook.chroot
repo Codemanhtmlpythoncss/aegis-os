@@ -88,6 +88,10 @@ if [ "$AEGIS_USBGUARD" = yes ]; then
     mkdir -p /etc/usbguard
     printf '# Aegis live default: allow all USB so input always works.\n# Tighten on YOUR hardware: sudo usbguard generate-policy > /etc/usbguard/rules.conf\nallow\n' \
         > /etc/usbguard/rules.conf
+    # usbguard-daemon.conf has AuditBackend=FileAudit -> it needs this dir, or it
+    # exits 1 on startup and systemd restart-thrashes it until start-limit-hit.
+    mkdir -p /var/log/usbguard
+    chmod 0750 /var/log/usbguard 2>/dev/null || true
 fi
 
 # --- hardened_malloc preload (GrapheneOS allocator) if present ---

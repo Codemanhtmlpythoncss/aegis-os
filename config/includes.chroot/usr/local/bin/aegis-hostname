@@ -1,0 +1,37 @@
+#!/bin/sh
+# aegis-hostname — set a fresh RANDOM hostname each boot so the machine name is
+# never a persistent identifier. Safe because Aegis doesn't broadcast the hostname
+# (no mDNS/LLMNR, dhcp-send-hostname=false).
+#
+# NOTE on philosophy: a *fixed generic* name shared by every install (the Tails
+# "amnesia" approach) can blend in better than a unique random one. If you prefer
+# that, put  AEGIS_FIXED_HOSTNAME=localhost  in /etc/aegis/hostname.conf.
+#
+# This runs very early (before the display manager, and possibly before dbus is
+# ready), so it must NOT depend on hostnamectl/dbus and must NEVER fail the unit
+# — every step is best-effort and we always exit 0.
+CONF=/etc/aegis/hostname.conf
+[ -r "$CONF" ] && . "$CONF"
+
+if [ -n "${AEGIS_FIXED_HOSTNAME:-}" ]; then
+    NEW="$AEGIS_FIXED_HOSTNAME"
+else
+    # od reads a fixed number of bytes (no SIGPIPE games like `... | head -c`).
+    RAND="$(od -An -N4 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')"
+    [ -n "$RAND" ] || RAND="$(date +%s 2>/dev/null)"
+    NEW="host-${RAND}"
+fi
+
+# Persist + apply via every available mechanism; don't rely on dbus being up.
+echo "$NEW" > /etc/hostname 2>/dev/null || true
+hostname "$NEW" 2>/dev/null || echo "$NEW" > /proc/sys/kernel/hostname 2>/dev/null || true
+hostnamectl set-hostname "$NEW" 2>/dev/null || true
+
+# Keep /etc/hosts consistent so local name resolution (sudo, etc.) stays fast.
+if grep -q '^127\.0\.1\.1[[:space:]]' /etc/hosts 2>/dev/null; then
+    sed -i "s/^127\.0\.1\.1[[:space:]].*/127.0.1.1 $NEW/" /etc/hosts 2>/dev/null || true
+else
+    echo "127.0.1.1 $NEW" >> /etc/hosts 2>/dev/null || true
+fi
+echo "aegis-hostname: set to $NEW"
+exit 0

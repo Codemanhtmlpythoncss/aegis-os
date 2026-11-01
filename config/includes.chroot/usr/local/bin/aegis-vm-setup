@@ -1,0 +1,60 @@
+#!/bin/bash
+# aegis-vm-setup — set up KVM compartmentalization: an isolated libvirt network
+# whose traffic is forced through the host's Tor (Whonix model). A VM attached to
+# the 'aegis-tor' network can ONLY reach the internet via Tor and cannot learn the
+# host's real IP.
+#
+# This is strong, VM/kernel-level isolation — but it runs on KVM, not a Xen type-1
+# hypervisor, so it is NOT literally Qubes. For Qubes' guarantees, run Qubes OS.
+#
+# Run as root. Idempotent.
+set -euo pipefail
+[ "$(id -u)" = 0 ] || { echo "run as root" >&2; exit 1; }
+
+SUBNET="10.152.152.0/24"
+BRIDGE="aegistor0"
+TRANS_PORT=9040
+DNS_PORT=5353
+
+echo "==> enabling libvirt"
+systemctl enable --now libvirtd 2>/dev/null || true
+
+echo "==> defining the isolated 'aegis-tor' network"
+if ! virsh net-info aegis-tor >/dev/null 2>&1; then
+    virsh net-define /etc/libvirt/qemu/networks/aegis-tor.xml
+fi
+virsh net-autostart aegis-tor 2>/dev/null || true
+virsh net-start aegis-tor 2>/dev/null || true
+
+echo "==> routing the VM subnet through Tor (nftables)"
+# Tor listens on 127.0.0.1; allow routing redirected packets there.
+sysctl -w net.ipv4.conf."${BRIDGE}".route_localnet=1 >/dev/null 2>&1 || true
+nft -f - <<EOF
+table ip aegis_vmtor {
+    chain prerouting {
+        type nat hook prerouting priority -100;
+        iifname "${BRIDGE}" meta l4proto { tcp, udp } th dport 53 dnat to 127.0.0.1:${DNS_PORT}
+        iifname "${BRIDGE}" meta l4proto tcp dnat to 127.0.0.1:${TRANS_PORT}
+    }
+    chain forward {
+        type filter hook forward priority 0;
+        # VMs may only talk to the Tor redirect; no direct clearnet, no LAN.
+        iifname "${BRIDGE}" ip daddr 127.0.0.1 accept
+        iifname "${BRIDGE}" drop
+    }
+}
+EOF
+
+cat <<'NOTE'
+
+==> Done. The 'aegis-tor' network is up and Tor-only.
+
+Next (manual — create your Tor-only workstation VM):
+  1. Open "Virtual Machine Manager" (virt-manager).
+  2. Create a VM (e.g. a minimal Debian or your Aegis ISO itself).
+  3. For its network, choose: Virtual network 'aegis-tor'.
+  That VM now reaches the internet ONLY through Tor and cannot see your real IP.
+
+Reminder: ensure the host network mode is 'tor' or 'both' (Aegis Control), so Tor's
+TransPort/DNSPort are listening. This is Whonix/Qubes-style isolation on KVM, not Xen.
+NOTE

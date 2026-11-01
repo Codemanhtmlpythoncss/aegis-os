@@ -91,6 +91,25 @@ jobs:
           sudo chmod 0666 /dev/kvm 2>/dev/null || true
           ISO="$(ls iso/*.iso | head -n1)"
           echo "Booting $ISO"
+          # --- Payload integrity: the ISO MUST contain the aegis helper scripts.
+          # A stray unanchored 'local/' in .gitignore once excluded all of
+          # config/includes.chroot/usr/local/ from git, so the CI image shipped
+          # without them and every aegis-* service died 'not found'. Guard it.
+          sudo apt-get update -qq >/dev/null 2>&1 || true
+          sudo apt-get install -y -qq squashfs-tools libarchive-tools >/dev/null 2>&1 || true
+          rm -rf _iso && mkdir _iso
+          bsdtar -C _iso -xf "$ISO" live/filesystem.squashfs 2>/dev/null || true
+          if [ -f _iso/live/filesystem.squashfs ]; then
+            MISSING=""
+            for s in aegis-firewall aegis-hostname aegis-apply aegis-mac-spoof aegis-ramwipe aegis-tordate aegis-media-watchdog; do
+              unsquashfs -ll _iso/live/filesystem.squashfs "usr/local/bin/$s" 2>/dev/null | grep -q "usr/local/bin/$s" || MISSING="$MISSING $s"
+            done
+            if [ -n "$MISSING" ]; then echo "PAYLOAD CHECK FAILED — aegis scripts missing from image:$MISSING"; exit 1; fi
+            echo "payload check OK: aegis helper scripts present in image"
+          else
+            echo "WARN: could not extract squashfs for payload check (continuing to boot test)"
+          fi
+          rm -rf _iso
           if [ -w /dev/kvm ]; then ACCEL="-enable-kvm -cpu host"; else echo "no KVM access -> TCG (slower)"; ACCEL="-cpu max"; fi
           if [ "${{ matrix.arch }}" = amd64 ]; then
             qemu-system-x86_64 $ACCEL -m 2048 -smp 2 -cdrom "$ISO" \
@@ -111,8 +130,13 @@ jobs:
           done
           kill "$QPID" 2>/dev/null || true
           echo "---- serial.log tail ----"; tail -n 50 serial.log 2>/dev/null || true
-          if [ "$OK" = 1 ] && grep -qE "Failed to start (NetworkManager|aegis-netmode|tor@default|systemd-user-sessions|i2pd)" serial.log 2>/dev/null; then
-            echo "CRITICAL SERVICE(S) FAILED:"; grep -E "Failed to start (NetworkManager|aegis-netmode|tor@default|systemd-user-sessions|i2pd)" serial.log | sort -u
+          # Fail on any deterministic critical-service failure. aegis-[a-z-]+ catches
+          # the whole family (hostname/netmode/liveuser/media-watchdog) so a missing
+          # script can never pass green again. (tor@default/i2pd are network-timing
+          # dependent in CI, so they're not hard-fails here.)
+          CRIT="Failed to start (NetworkManager|systemd-user-sessions|aegis-[a-z-]+)"
+          if [ "$OK" = 1 ] && grep -qE "$CRIT" serial.log 2>/dev/null; then
+            echo "CRITICAL SERVICE(S) FAILED:"; grep -E "$CRIT" serial.log | sort -u
             OK=0
           fi
           if [ "$OK" = 1 ]; then echo "BOOT SMOKE-TEST PASSED"; else echo "BOOT SMOKE-TEST FAILED"; exit 1; fi

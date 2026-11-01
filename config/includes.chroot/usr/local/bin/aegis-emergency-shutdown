@@ -1,0 +1,15 @@
+#!/bin/sh
+# aegis-emergency-shutdown — called when the live USB is pulled. Wipe RAM and power
+# off immediately (Tails-style). The clean poweroff runs aegis-ramwipe.service on
+# the way down (sdmem over free RAM); init_on_free/page_poison already zero freed
+# pages. A hard fallback guarantees power-off even if shutdown stalls.
+logger -t aegis "live medium removed -- emergency wipe + power off" 2>/dev/null || true
+
+# Stop user activity right away.
+pkill -9 -t tty1 2>/dev/null || true
+
+# Hard fallback: force power off if the clean shutdown hasn't finished in time.
+( sleep 45; echo o > /proc/sysrq-trigger 2>/dev/null; /sbin/poweroff -f 2>/dev/null ) &
+
+# Clean poweroff -> triggers the RAM wipe service, then powers off.
+systemctl --no-wall poweroff 2>/dev/null || { echo o > /proc/sysrq-trigger 2>/dev/null; /sbin/poweroff -f; }

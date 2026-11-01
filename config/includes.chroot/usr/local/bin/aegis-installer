@@ -1,0 +1,17 @@
+#!/bin/sh
+# aegis-installer — the "Install Aegis" entry point on the live desktop.
+# 1) collects Aegis options into /etc/calamares/aegis-options.env
+# 2) launches Calamares, which partitions/encrypts/clones the base and then runs
+#    aegis-apply inside the target to act on those options.
+set -e
+
+OPTS=/etc/calamares/aegis-options.env
+
+# Step 1: options dialog. Non-zero exit = user cancelled -> stop.
+if ! python3 /usr/share/aegis/setup-wizard/aegis_options.py --install --options-file "$OPTS"; then
+    echo "Install cancelled."
+    exit 0
+fi
+
+# Step 2: run Calamares as root (PolicyKit prompt).
+exec pkexec calamares

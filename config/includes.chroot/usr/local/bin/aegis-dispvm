@@ -1,0 +1,29 @@
+#!/bin/sh
+# aegis-dispvm — run an app in a DISPOSABLE sandbox.
+# Fresh throwaway home (tmpfs), no access to your real files, wiped on exit.
+# Network still passes through the host's fail-closed Tor firewall, so traffic
+# stays anonymous. This is process-level isolation (firejail/bubblewrap) — a
+# poor-man's Qubes disposable VM, NOT a separate kernel. For kernel-level
+# isolation use `aegis-vm-setup` (KVM) or real Qubes.
+#
+# Usage: aegis-dispvm [command [args…]]   (default: a disposable terminal)
+set -eu
+APP="${1:-xfce4-terminal}"
+[ $# -gt 0 ] && shift || true
+
+if command -v firejail >/dev/null 2>&1; then
+    # --private gives a tmpfs HOME discarded on exit; drop privileges/caps.
+    exec firejail --quiet --private --noroot --caps.drop=all --seccomp \
+         --disable-mnt --private-tmp "$APP" "$@"
+fi
+
+# Fallback: bubblewrap with a tmpfs home and read-only system.
+TMP="$(mktemp -d /tmp/aegis-dispvm.XXXXXX)"
+trap 'rm -rf "$TMP"' EXIT INT TERM
+exec bwrap \
+    --ro-bind /usr /usr --ro-bind /etc /etc \
+    --symlink usr/bin /bin --symlink usr/lib /lib --symlink usr/lib64 /lib64 \
+    --proc /proc --dev /dev --tmpfs /tmp \
+    --bind "$TMP" "$HOME" --setenv HOME "$HOME" \
+    --unshare-user --unshare-pid --die-with-parent \
+    "$APP" "$@"

@@ -1,0 +1,183 @@
+#!/bin/bash
+# aegis-apply — runs INSIDE the freshly-installed target (Calamares chroot).
+# Reads /etc/aegis/install-options.env (staged by Calamares from the live session)
+# and turns the user's installer choices into real configuration + packages.
+#
+# The base system is already a hardened Aegis XFCE image (cloned by unpackfs), so
+# this only adds/swaps the chosen pieces and flips toggles. Network is available
+# because Calamares mounts resolv.conf + binds into the chroot.
+set -u
+OPTS=/etc/aegis/install-options.env
+log() { echo "I: [aegis-apply] $*"; }
+warn() { echo "W: [aegis-apply] $*"; }
+
+[ -r "$OPTS" ] && . "$OPTS" || { warn "no options file; using defaults"; }
+: "${AEGIS_NETMODE:=tor}"
+: "${AEGIS_MAC_SPOOF:=yes}"
+: "${AEGIS_BROWSER:=firefox}"
+: "${AEGIS_DE:=xfce}"
+: "${AEGIS_KALI:=none}"
+: "${AEGIS_AMNESIC:=yes}"
+: "${AEGIS_USBGUARD:=yes}"
+: "${AEGIS_RAM_WIPE:=yes}"
+: "${AEGIS_COMPARTMENT:=sandbox}"
+: "${AEGIS_STEALTH:=yes}"
+
+export DEBIAN_FRONTEND=noninteractive
+apt_install() { apt-get install -y --no-install-recommends "$@" || warn "install failed: $*"; }
+
+mkdir -p /etc/aegis
+
+# ---------------------------------------------------------------- network mode
+echo "$AEGIS_NETMODE" > /etc/aegis/netmode
+log "network mode = $AEGIS_NETMODE"
+if [ "$AEGIS_KALI" != none ] && [ "$AEGIS_NETMODE" = tor ]; then
+    warn "Kali tools + Tor fail-closed firewall will block most pentest traffic."
+    warn "Switch to 'direct' in Aegis Control when you need raw network access."
+fi
+
+# ---------------------------------------------------------------- MAC spoofing
+if [ "$AEGIS_MAC_SPOOF" = yes ]; then
+    [ -f /etc/NetworkManager/conf.d/00-aegis-macrandom.conf.off ] && \
+        mv /etc/NetworkManager/conf.d/00-aegis-macrandom.conf.off \
+           /etc/NetworkManager/conf.d/00-aegis-macrandom.conf
+    log "MAC spoofing enabled"
+else
+    [ -f /etc/NetworkManager/conf.d/00-aegis-macrandom.conf ] && \
+        mv /etc/NetworkManager/conf.d/00-aegis-macrandom.conf \
+           /etc/NetworkManager/conf.d/00-aegis-macrandom.conf.off
+    log "MAC spoofing disabled"
+fi
+
+# ---------------------------------------------------------------- browser
+apt-get update || true
+case "$AEGIS_BROWSER" in
+    firefox)
+        apt_install firefox-esr webext-ublock-origin-firefox
+        DEFBROWSER=firefox-esr.desktop ;;
+    torbrowser)
+        apt_install torbrowser-launcher
+        DEFBROWSER=torbrowser.desktop ;;
+    mullvad)
+        install -d -m0755 /etc/apt/keyrings
+        curl -fsSL https://repository.mullvad.net/deb/mullvad-keyring.asc \
+            -o /etc/apt/keyrings/mullvad-keyring.asc || true
+        echo "deb [signed-by=/etc/apt/keyrings/mullvad-keyring.asc arch=$(dpkg --print-architecture)] https://repository.mullvad.net/deb/stable $(. /etc/os-release; echo "$VERSION_CODENAME") main" \
+            > /etc/apt/sources.list.d/mullvad.list
+        apt-get update || true; apt_install mullvad-browser
+        DEFBROWSER=mullvad-browser.desktop ;;
+    librewolf)
+        install -d -m0755 /etc/apt/keyrings
+        curl -fsSL https://deb.librewolf.net/keyring.gpg -o /etc/apt/keyrings/librewolf.gpg || true
+        cat > /etc/apt/sources.list.d/librewolf.sources <<EOF
+Types: deb
+URIs: https://deb.librewolf.net
+Suites: $(. /etc/os-release; echo "$VERSION_CODENAME")
+Components: main
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/librewolf.gpg
+EOF
+        apt-get update || true; apt_install librewolf
+        DEFBROWSER=librewolf.desktop ;;
+esac
+[ -n "${DEFBROWSER:-}" ] && xdg-settings set default-web-browser "$DEFBROWSER" 2>/dev/null || true
+log "browser = $AEGIS_BROWSER"
+
+# ---------------------------------------------------------------- desktop env
+# XFCE is already in the base image. Install + default a different DE if chosen.
+case "$AEGIS_DE" in
+    xfce) DM=lightdm ;;
+    kde)  apt_install kde-plasma-desktop sddm konsole dolphin; DM=sddm ;;
+    gnome) apt_install gnome-core gdm3 gnome-terminal nautilus; DM=gdm3 ;;
+    i3)   apt_install i3 i3status i3lock dmenu; DM=lightdm ;;
+esac
+if [ -n "${DM:-}" ]; then
+    echo "/usr/sbin/$DM" > /etc/X11/default-display-manager 2>/dev/null || true
+    # debconf the default DM (best-effort)
+    echo "$DM shared/default-x-display-manager select $DM" | debconf-set-selections 2>/dev/null || true
+    dpkg-reconfigure -f noninteractive "$DM" 2>/dev/null || true
+fi
+log "desktop = $AEGIS_DE (display manager $DM)"
+
+# ---------------------------------------------------------------- Kali toolkit
+if [ "$AEGIS_KALI" != none ]; then
+    warn "installing Kali metapackage $AEGIS_KALI — this greatly increases attack surface."
+    install -d -m0755 /etc/apt/keyrings
+    curl -fsSL https://archive.kali.org/archive-keyring.gpg \
+        -o /etc/apt/keyrings/kali-archive-keyring.gpg || true
+    echo "deb [signed-by=/etc/apt/keyrings/kali-archive-keyring.gpg] http://http.kali.org/kali kali-rolling main contrib non-free non-free-firmware" \
+        > /etc/apt/sources.list.d/kali.list
+    cat > /etc/apt/preferences.d/kali-pin <<EOF
+Package: *
+Pin: release o=Kali
+Pin-Priority: 50
+EOF
+    apt-get update || true
+    apt-get install -y -t kali-rolling "$AEGIS_KALI" || warn "Kali install had errors (review log)."
+fi
+
+# ---------------------------------------------------------------- toggles
+if [ "$AEGIS_USBGUARD" = yes ]; then systemctl enable usbguard 2>/dev/null || true
+else systemctl disable usbguard 2>/dev/null || true; fi
+
+if [ "$AEGIS_RAM_WIPE" = yes ]; then systemctl enable aegis-ramwipe.service 2>/dev/null || true
+else systemctl disable aegis-ramwipe.service 2>/dev/null || true; fi
+
+if [ "$AEGIS_AMNESIC" = yes ]; then
+    # Keep journald in RAM; don't persist logs across boots.
+    mkdir -p /etc/systemd/journald.conf.d
+    printf '[Journal]\nStorage=volatile\n' > /etc/systemd/journald.conf.d/aegis-amnesic.conf
+    log "amnesic: journald volatile"
+fi
+
+systemctl enable aegis-netmode.service 2>/dev/null || true
+
+# ---------------------------------------------------------------- compartmentalization
+case "$AEGIS_COMPARTMENT" in
+    sandbox|vm)
+        # Sandbox every supported app by default (firejail symlinks).
+        command -v firecfg >/dev/null 2>&1 && firecfg >/dev/null 2>&1 || true
+        log "firejail sandbox-by-default enabled" ;;
+esac
+if [ "$AEGIS_COMPARTMENT" = vm ]; then
+    log "installing KVM compartmentalization (Whonix-style, not Xen/Qubes)"
+    apt_install qemu-system-x86 qemu-system-arm qemu-utils libvirt-daemon-system \
+                libvirt-clients virt-manager bridge-utils dnsmasq-base ovmf
+    systemctl enable libvirtd 2>/dev/null || true
+    # The isolated Tor-only network is wired up on first boot (needs a running host):
+    #   sudo aegis-vm-setup
+    log "after first boot run 'sudo aegis-vm-setup' to create the Tor-only VM network"
+fi
+
+# ---------------------------------------------------------------- stealth (undo if off)
+if [ "$AEGIS_STEALTH" != yes ]; then
+    warn "stealth networking disabled by choice — re-enabling standard services"
+    systemctl unmask systemd-timesyncd 2>/dev/null || true
+    systemctl enable systemd-timesyncd 2>/dev/null || true
+    systemctl disable aegis-tordate.service 2>/dev/null || true
+    rm -f /etc/modprobe.d/aegis-radios.conf \
+          /etc/sysctl.d/99-aegis-stealth.conf \
+          /etc/systemd/resolved.conf.d/10-aegis-stealth.conf \
+          /etc/NetworkManager/conf.d/30-aegis-stealth.conf 2>/dev/null || true
+fi
+
+# ---------------------------------------------------------------- de-install the installer
+# The installed system should not carry the live installer.
+apt-get purge -y calamares 2>/dev/null || true
+rm -f /usr/share/applications/install-aegis.desktop \
+      /etc/skel/Desktop/install-aegis.desktop \
+      "$HOME/Desktop/install-aegis.desktop" \
+      /etc/xdg/autostart/aegis-installer.desktop 2>/dev/null || true
+rm -f /usr/local/bin/aegis-installer 2>/dev/null || true
+# Installed systems have a real user password, so restore normal screen locking
+# and drop the live-only autologin/password bits.
+rm -f /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-screensaver.xml \
+      /etc/xdg/autostart/xfce4-screensaver.desktop \
+      /etc/lightdm/lightdm.conf.d/10-aegis-autologin.conf 2>/dev/null || true
+# We shipped a Hidden=true override to stop the live session from idle-locking;
+# restore the package's real autostart so the installed desktop locks normally.
+apt-get install --reinstall -y -o Dpkg::Options::=--force-confmiss xfce4-screensaver 2>/dev/null || true
+systemctl disable aegis-liveuser.service 2>/dev/null || true
+apt-get autoremove -y 2>/dev/null || true
+
+log "done."

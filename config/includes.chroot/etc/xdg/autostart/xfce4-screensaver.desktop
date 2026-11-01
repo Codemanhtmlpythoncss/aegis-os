@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Xfce Screensaver (disabled on Aegis live)
+# The Aegis live session is autologin + amnesic. An idle screen-lock has nothing
+# useful to protect here and historically stranded users at an unlockable prompt,
+# so we stop the screensaver/locker daemon from autostarting. (The xfconf defaults
+# in xfce4-screensaver.xml also disable locking; this is belt-and-suspenders —
+# NoDisplay alone does NOT prevent autostart, only Hidden=true does.)
+# Installed systems get a real password and restore locking via aegis-apply.
+Exec=xfce4-screensaver
+OnlyShowIn=XFCE;
+Hidden=true
+X-GNOME-Autostart-enabled=false

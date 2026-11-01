@@ -1,0 +1,12 @@
+#!/bin/bash
+# aegis-ramwipe — best-effort RAM erase on shutdown (anti cold-boot).
+# NOTE: the strong protection is the kernel cmdline (init_on_free=1 page_poison=1),
+# which build.sh sets on the boot entry. This is the belt-and-braces pass that
+# overwrites remaining free memory just before power-off.
+set -u
+echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
+if command -v sdmem >/dev/null 2>&1; then
+    # Fill & wipe free RAM (fast, single-pass; shutdown must stay quick).
+    sdmem -llv 2>/dev/null || true
+fi
+sync

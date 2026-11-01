@@ -13,7 +13,12 @@ binary.modified/
 tftpboot/
 cache/
 auto/
-local/
+# Anchor to the repo root: this is live-build's generated top-level local/ dir.
+# WITHOUT the leading slash this also matched config/includes.chroot/usr/local/,
+# silently excluding every hand-written aegis-* helper from git (and thus from
+# the CI-built ISO) — which left aegis-hostname/aegis-firewall/aegis-apply/etc.
+# "not found" at runtime. Keep it anchored.
+/local/
 
 # --- live-build's own generated config files (we ship only package-lists/hooks/includes) ---
 config/binary

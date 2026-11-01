@@ -1,0 +1,38 @@
+#!/bin/bash
+# aegis-mac-spoof — control MAC randomization. Run as root.
+# NetworkManager handles per-connection randomization (see
+# /etc/NetworkManager/conf.d/00-aegis-macrandom.conf); this script also lets you
+# force an immediate random MAC with macchanger, or turn it off for captive
+# portals / networks that bind identity to MAC.
+# Usage: aegis-mac-spoof {on|off|now|status} [iface]
+set -euo pipefail
+
+NM_CONF=/etc/NetworkManager/conf.d/00-aegis-macrandom.conf
+OFF_CONF=/etc/NetworkManager/conf.d/00-aegis-macrandom.conf.off
+
+die() { echo "aegis-mac-spoof: $*" >&2; exit 1; }
+[[ $EUID -eq 0 ]] || die "must run as root"
+
+default_iface() { ip -o link show | awk -F': ' '$2!="lo"{print $2; exit}'; }
+
+case "${1:-status}" in
+  on)
+    [[ -f "$OFF_CONF" ]] && mv "$OFF_CONF" "$NM_CONF"
+    systemctl restart NetworkManager
+    echo "MAC randomization: ON (random MAC per connection)." ;;
+  off)
+    [[ -f "$NM_CONF" ]] && mv "$NM_CONF" "$OFF_CONF"
+    systemctl restart NetworkManager
+    echo "MAC randomization: OFF (hardware MAC in use). Use on trusted/captive nets only." ;;
+  now)
+    IFACE="${2:-$(default_iface)}"
+    ip link set dev "$IFACE" down
+    macchanger -r "$IFACE"
+    ip link set dev "$IFACE" up
+    echo "Forced a fresh random MAC on $IFACE." ;;
+  status)
+    IFACE="${2:-$(default_iface)}"
+    macchanger -s "$IFACE" || ip link show "$IFACE"
+    [[ -f "$NM_CONF" ]] && echo "NM randomization: ENABLED" || echo "NM randomization: disabled" ;;
+  *) die "usage: aegis-mac-spoof {on|off|now|status} [iface]" ;;
+esac

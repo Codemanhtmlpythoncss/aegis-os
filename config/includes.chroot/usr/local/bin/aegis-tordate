@@ -1,0 +1,18 @@
+#!/bin/sh
+# aegis-tordate — set the clock from an HTTPS "Date:" header fetched over Tor,
+# htpdate-style, so Aegis never contacts a clearnet NTP server (which would leak
+# that this machine exists and roughly where). Best-effort: Tor tolerates modest
+# skew, so a failure here is non-fatal. Only runs in Tor/both network modes.
+set -u
+MODE="$(cat /etc/aegis/netmode 2>/dev/null || echo tor)"
+case "$MODE" in tor|both) ;; *) exit 0 ;; esac
+
+for url in https://www.torproject.org https://check.torproject.org https://duckduckgo.com; do
+    D="$(torsocks curl -sSI --max-time 25 "$url" 2>/dev/null \
+         | awk -F': ' 'tolower($1)=="date"{print $2; exit}')"
+    if [ -n "$D" ]; then
+        date -us "$D" >/dev/null 2>&1 && { echo "aegis-tordate: clock set over Tor"; exit 0; }
+    fi
+done
+echo "aegis-tordate: could not set time over Tor (continuing anyway)" >&2
+exit 0

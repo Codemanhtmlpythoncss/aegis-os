@@ -1,0 +1,34 @@
+#!/bin/sh
+# aegis-media-watchdog — Tails-style "pull it and it wipes". Watches the live boot
+# medium; if it disappears (USB yanked), triggers the emergency wipe + power off.
+# Only guards REMOVABLE media, and only on a live boot — never a fixed-disk install.
+set -u
+
+[ -d /run/live/medium ] || { echo "not a live boot; watchdog idle"; exit 0; }
+
+DEV="$(findmnt -nro SOURCE /run/live/medium 2>/dev/null | head -1)"
+[ -n "$DEV" ] || { echo "no live medium source; idle"; exit 0; }
+
+# Resolve to the parent whole-disk device (e.g. /dev/sda1 -> /dev/sda; /dev/sr0 stays).
+case "$DEV" in
+  /dev/sr*) PARENT="$DEV" ;;
+  *) PK="$(lsblk -nro pkname "$DEV" 2>/dev/null | head -1)"
+     [ -n "$PK" ] && PARENT="/dev/$PK" || PARENT="$DEV" ;;
+esac
+
+# Only guard removable media (don't wipe when someone boots the ISO off a hard disk).
+RM="$(lsblk -nro RM "$PARENT" 2>/dev/null | head -1)"
+if [ "$RM" != 1 ]; then echo "medium $PARENT not removable; watchdog idle"; exit 0; fi
+
+echo "aegis-media-watchdog: guarding $PARENT -- remove it to wipe & power off"
+# Poll for the device vanishing. Require two consecutive misses to avoid a glitch.
+misses=0
+while :; do
+  if [ -b "$PARENT" ]; then
+    misses=0
+  else
+    misses=$((misses + 1))
+    [ "$misses" -ge 2 ] && { exec /usr/local/bin/aegis-emergency-shutdown; }
+  fi
+  sleep 1
+done

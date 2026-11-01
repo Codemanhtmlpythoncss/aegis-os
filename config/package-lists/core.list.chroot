@@ -6,6 +6,12 @@
 live-boot
 live-config
 live-config-systemd
+# user-setup is only *Recommended* by live-config, and we build with
+# --apt-recommends false. Without it, live-config's 0030-user-setup skips
+# entirely: no live 'user' account is created and no password is set, so
+# lightdm autologin fails (you land on the greeter) and 'user'/'live' is
+# rejected. Pull it in explicitly.
+user-setup
 firmware-linux-free
 
 # --- firewall / networking ---
