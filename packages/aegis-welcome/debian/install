@@ -1,0 +1,3 @@
+usr/bin/aegis-welcome usr/bin/
+usr/share/applications/aegis-welcome.desktop usr/share/applications/
+etc/xdg/autostart/aegis-welcome.desktop etc/xdg/autostart/

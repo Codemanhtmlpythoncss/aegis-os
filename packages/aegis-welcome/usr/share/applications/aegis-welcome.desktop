@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Welcome to Aegis
+GenericName=First-boot setup
+Comment=Set up Aegis privacy options and optionally install to disk
+Exec=aegis-welcome
+Icon=system-help
+Terminal=false
+Categories=System;Settings;
+Keywords=aegis;welcome;setup;first;boot;install;
+StartupNotify=true

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Aegis Control Center
+GenericName=Privacy control panel
+Comment=Switch network mode, check status, spoof MAC, panic wipe
+Exec=aegis-control
+Icon=security-high
+Terminal=false
+Categories=System;Settings;Security;
+Keywords=aegis;tor;i2p;privacy;anonymity;firewall;mac;
+StartupNotify=true

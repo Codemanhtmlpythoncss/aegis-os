@@ -1,0 +1,23 @@
+Source: aegis-welcome
+Section: admin
+Priority: optional
+Maintainer: Aegis OS <aegis@aegis-os.localdomain>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/Codemanhtmlpythoncss/aegis-os
+Rules-Requires-Root: no
+
+Package: aegis-welcome
+Architecture: all
+Depends: ${misc:Depends},
+         python3,
+         python3-gi,
+         gir1.2-gtk-3.0,
+         pkexec,
+         aegis-firewall (>= 1.2.0)
+Recommends: aegis-control
+Description: Aegis OS first-boot welcome wizard (GTK)
+ A friendly setup assistant shown on first login: it explains what Aegis is,
+ lets the user choose a network mode (Tor / I2P / Both / Direct) and MAC-spoofing
+ in plain language, applies those choices, and offers to install Aegis to disk.
+ It runs once and then leaves a marker so it never reappears.

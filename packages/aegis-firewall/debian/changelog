@@ -3,5 +3,7 @@ aegis-firewall (1.2.0) trixie; urgency=medium
   * Initial packaging: aegis-firewall, the nftables Tor ruleset and the
     aegis-netmode service, moved out of the live-build hooks. Binary now lives
     at /usr/sbin/aegis-firewall and reads /etc/aegis/nftables-tor.conf.
+  * Add aegis-netmode-set: persist + apply a network mode in one privileged
+    step (invoked via pkexec from the Aegis Control Center).
 
  -- Aegis OS <aegis@aegis-os.localdomain>  Sat, 01 Nov 2026 09:40:00 +0000

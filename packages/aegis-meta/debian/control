@@ -11,7 +11,9 @@ Package: aegis-meta
 Architecture: all
 Depends: ${misc:Depends},
          aegis-base (>= 1.2.0),
-         aegis-firewall (>= 1.2.0)
+         aegis-firewall (>= 1.2.0),
+         aegis-control (>= 1.2.0),
+         aegis-welcome (>= 1.2.0)
 Description: Aegis OS — full metapackage
  Installs the complete Aegis OS integration. Adding the Aegis APT repository and
  installing this package turns a Debian system into Aegis OS; the Aegis live and

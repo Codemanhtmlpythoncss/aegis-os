@@ -1,4 +1,5 @@
 usr/sbin/aegis-firewall usr/sbin/
+usr/sbin/aegis-netmode-set usr/sbin/
 etc/aegis/nftables-tor.conf etc/aegis/
 etc/aegis/netmode etc/aegis/
 usr/lib/systemd/system/aegis-netmode.service usr/lib/systemd/system/

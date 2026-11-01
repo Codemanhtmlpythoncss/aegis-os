@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Welcome to Aegis
+Comment=First-boot setup wizard (self-disables after it runs once)
+# The wizard exits immediately if ~/.config/aegis/welcome-done exists, so this
+# autostart is effectively a once-per-user run.
+Exec=aegis-welcome
+OnlyShowIn=XFCE;
+Terminal=false
+X-GNOME-Autostart-enabled=true

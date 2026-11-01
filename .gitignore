@@ -51,6 +51,8 @@ packages/**/debian/*.debhelper.log
 packages/**/debian/aegis-base/
 packages/**/debian/aegis-firewall/
 packages/**/debian/aegis-meta/
+packages/**/debian/aegis-control/
+packages/**/debian/aegis-welcome/
 
 # --- python / editor cruft ---
 __pycache__/

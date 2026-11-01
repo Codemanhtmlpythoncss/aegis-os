@@ -1,0 +1,12 @@
+#!/bin/sh
+# aegis-netmode-set <tor|i2p|both|direct> — persist the chosen network mode and
+# apply it immediately. Root only (invoked via pkexec by the Control Center).
+set -e
+mode="${1:-}"
+case "$mode" in
+    tor|i2p|both|direct) ;;
+    *) echo "usage: aegis-netmode-set <tor|i2p|both|direct>" >&2; exit 2 ;;
+esac
+mkdir -p /etc/aegis
+echo "$mode" > /etc/aegis/netmode
+exec /usr/sbin/aegis-firewall "$mode"

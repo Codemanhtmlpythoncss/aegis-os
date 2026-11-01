@@ -1,0 +1,219 @@
+#!/usr/bin/python3
+# Aegis Control Center — one place to manage Aegis privacy settings:
+# network mode (Tor/I2P/Both/Direct), live status, MAC spoofing, updates and panic.
+#
+# Privileged actions are run via pkexec against small, audited helpers
+# (aegis-netmode-set, aegis-mac-spoof, aegis-emergency-shutdown) so the GUI
+# itself runs unprivileged.
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, GLib, Pango
+import subprocess
+
+NETMODE_FILE = "/etc/aegis/netmode"
+MODES = [
+    ("tor",    "Tor",    "Fail-closed: all traffic routed through Tor. Leaks are dropped."),
+    ("both",   "Both",   "Tor transparent routing plus i2pd proxies for .i2p sites."),
+    ("i2p",    "I2P",    "Tight firewall + i2pd SOCKS/HTTP proxies on localhost."),
+    ("direct", "Direct", "Plain firewall, no forced routing. NOT anonymous."),
+]
+
+
+def run(cmd, timeout=12):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except Exception as e:  # noqa: BLE001
+        class R:
+            returncode = 1
+            stdout = ""
+            stderr = str(e)
+        return R()
+
+
+def read_netmode():
+    try:
+        with open(NETMODE_FILE) as f:
+            return f.read().strip() or "tor"
+    except OSError:
+        return "tor"
+
+
+def is_active(unit):
+    return run(["systemctl", "is-active", unit]).stdout.strip() == "active"
+
+
+class AegisControl(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Aegis Control Center")
+        self.set_default_size(480, 600)
+
+        hb = Gtk.HeaderBar(show_close_button=True, title="Aegis Control Center",
+                           subtitle="privacy & anonymity")
+        self.set_titlebar(hb)
+        refresh = Gtk.Button.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON)
+        refresh.set_tooltip_text("Refresh status")
+        refresh.connect("clicked", lambda *_: self.refresh_status())
+        hb.pack_end(refresh)
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        outer.set_border_width(16)
+        self.add(outer)
+
+        outer.pack_start(self._status_frame(), False, False, 0)
+        outer.pack_start(self._netmode_frame(), False, False, 0)
+        outer.pack_start(self._tools_frame(), False, False, 0)
+
+        note = Gtk.Label()
+        note.set_markup("<small>Privileged actions ask for your password "
+                        "(the live session password is <b>live</b>).</small>")
+        note.set_line_wrap(True)
+        note.set_xalign(0)
+        outer.pack_end(note, False, False, 0)
+
+        self.refresh_status()
+
+    # ---- status ---------------------------------------------------------
+    def _status_frame(self):
+        fr = Gtk.Frame(label=" Status ")
+        grid = Gtk.Grid(column_spacing=12, row_spacing=6)
+        grid.set_border_width(12)
+        fr.add(grid)
+        self.lbl_mode = self._status_row(grid, 0, "Network mode")
+        self.lbl_tor = self._status_row(grid, 1, "Tor")
+        self.lbl_i2p = self._status_row(grid, 2, "I2P (i2pd)")
+        self.lbl_fw = self._status_row(grid, 3, "Firewall")
+        return fr
+
+    def _status_row(self, grid, row, name):
+        k = Gtk.Label(label=name, xalign=0)
+        k.set_width_chars(14)
+        v = Gtk.Label(xalign=0)
+        v.set_ellipsize(Pango.EllipsizeMode.END)
+        grid.attach(k, 0, row, 1, 1)
+        grid.attach(v, 1, row, 1, 1)
+        return v
+
+    def _set(self, label, text, ok=None):
+        colour = ""
+        if ok is True:
+            colour = ' foreground="#2dd4bf"'
+        elif ok is False:
+            colour = ' foreground="#ef4444"'
+        label.set_markup(f'<span{colour}>{GLib.markup_escape_text(text)}</span>')
+
+    def refresh_status(self):
+        mode = read_netmode()
+        self._set(self.lbl_mode, mode.upper(), ok=(mode != "direct"))
+        tor = is_active("tor@default.service") or is_active("tor.service")
+        self._set(self.lbl_tor, "running" if tor else "stopped", ok=tor)
+        i2p = is_active("i2pd.service")
+        self._set(self.lbl_i2p, "running" if i2p else "stopped", ok=i2p)
+        fw = is_active("aegis-netmode.service")
+        self._set(self.lbl_fw, "applied" if fw else "not applied", ok=fw)
+        if hasattr(self, "mode_radios"):
+            btn = self.mode_radios.get(mode)
+            if btn:
+                btn.set_active(True)
+
+    # ---- network mode ---------------------------------------------------
+    def _netmode_frame(self):
+        fr = Gtk.Frame(label=" Network mode ")
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_border_width(12)
+        fr.add(box)
+        self.mode_radios = {}
+        group = None
+        for key, name, desc in MODES:
+            rb = Gtk.RadioButton.new_with_label_from_widget(group, f"{name}")
+            if group is None:
+                group = rb
+            d = Gtk.Label(xalign=0)
+            d.set_markup(f"<small>{GLib.markup_escape_text(desc)}</small>")
+            d.set_margin_start(26)
+            box.pack_start(rb, False, False, 0)
+            box.pack_start(d, False, False, 0)
+            self.mode_radios[key] = rb
+        apply_btn = Gtk.Button(label="Apply network mode")
+        apply_btn.get_style_context().add_class("suggested-action")
+        apply_btn.connect("clicked", self.on_apply_mode)
+        box.pack_start(apply_btn, False, False, 6)
+        return fr
+
+    def on_apply_mode(self, _btn):
+        mode = next((k for k, rb in self.mode_radios.items() if rb.get_active()), "tor")
+        r = run(["pkexec", "/usr/sbin/aegis-netmode-set", mode], timeout=60)
+        if r.returncode == 0:
+            self.toast(f"Network mode set to {mode.upper()}.")
+        else:
+            self.toast(f"Failed to set mode: {r.stderr.strip() or 'cancelled'}", err=True)
+        self.refresh_status()
+
+    # ---- tools ----------------------------------------------------------
+    def _tools_frame(self):
+        fr = Gtk.Frame(label=" Tools ")
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.set_border_width(12)
+        fr.add(box)
+
+        mac = Gtk.Button(label="Spoof MAC address now")
+        mac.connect("clicked", self.on_mac)
+        box.pack_start(mac, False, False, 0)
+
+        upd = Gtk.Button(label="Check for updates")
+        upd.connect("clicked", self.on_update)
+        box.pack_start(upd, False, False, 0)
+
+        panic = Gtk.Button(label="Panic — wipe RAM & power off")
+        panic.get_style_context().add_class("destructive-action")
+        panic.connect("clicked", self.on_panic)
+        box.pack_start(panic, False, False, 0)
+        return fr
+
+    def on_mac(self, _btn):
+        r = run(["pkexec", "/usr/sbin/aegis-mac-spoof"], timeout=30)
+        self.toast("MAC addresses spoofed." if r.returncode == 0
+                   else f"MAC spoof failed: {r.stderr.strip() or 'cancelled'}",
+                   err=(r.returncode != 0))
+
+    def on_update(self, _btn):
+        # Open a terminal running the upgrade so the user can watch progress.
+        cmd = ("sh -c 'sudo apt-get update && sudo apt-get -y full-upgrade; "
+               "echo; echo \"[press Enter to close]\"; read _'")
+        for term in (["x-terminal-emulator", "-e"], ["xfce4-terminal", "-e"], ["xterm", "-e"]):
+            if run(["which", term[0]]).returncode == 0:
+                subprocess.Popen(term + [cmd])
+                return
+        self.toast("No terminal emulator found.", err=True)
+
+    def on_panic(self, _btn):
+        dlg = Gtk.MessageDialog(transient_for=self, modal=True,
+                                message_type=Gtk.MessageType.WARNING,
+                                buttons=Gtk.ButtonsType.NONE,
+                                text="Panic: wipe RAM and power off now?")
+        dlg.format_secondary_text("Everything in this live session is lost. This cannot be undone.")
+        dlg.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        wipe = dlg.add_button("Wipe & power off", Gtk.ResponseType.OK)
+        wipe.get_style_context().add_class("destructive-action")
+        resp = dlg.run()
+        dlg.destroy()
+        if resp == Gtk.ResponseType.OK:
+            subprocess.Popen(["pkexec", "/usr/sbin/aegis-emergency-shutdown"])
+
+    # ---- helpers --------------------------------------------------------
+    def toast(self, text, err=False):
+        dlg = Gtk.MessageDialog(transient_for=self, modal=True,
+                                message_type=(Gtk.MessageType.ERROR if err else Gtk.MessageType.INFO),
+                                buttons=Gtk.ButtonsType.OK, text=text)
+        dlg.run()
+        dlg.destroy()
+
+
+def main():
+    win = AegisControl()
+    win.connect("destroy", Gtk.main_quit)
+    win.show_all()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()

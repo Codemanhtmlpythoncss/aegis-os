@@ -1,0 +1,4 @@
+#!/usr/bin/make -f
+# Aegis OS Control Center.
+%:
+	dh $@

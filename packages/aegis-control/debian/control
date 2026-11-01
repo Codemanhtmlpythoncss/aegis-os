@@ -1,0 +1,26 @@
+Source: aegis-control
+Section: admin
+Priority: optional
+Maintainer: Aegis OS <aegis@aegis-os.localdomain>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/Codemanhtmlpythoncss/aegis-os
+Rules-Requires-Root: no
+
+Package: aegis-control
+Architecture: all
+Depends: ${misc:Depends},
+         python3,
+         python3-gi,
+         gir1.2-gtk-3.0,
+         pkexec,
+         polkitd,
+         aegis-firewall (>= 1.2.0)
+Recommends: aegis-net
+Description: Aegis OS Control Center (GTK)
+ A single graphical panel to manage Aegis privacy settings: switch the network
+ mode (Tor / I2P / Both / Direct), see live Tor/I2P/firewall status, spoof the
+ MAC address, check for updates, and trigger an emergency RAM-wipe + power-off.
+ .
+ Privileged actions are run via pkexec against small audited helpers, so the GUI
+ itself runs unprivileged.
