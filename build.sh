@@ -81,7 +81,9 @@ stage_payload() {
   # display manager by the 0150 hook so KDE's sddm / GNOME's gdm3 don't take over.
   cp -f catalog/de-*.list.chroot            config/package-lists/
   cp -f catalog/browser-firefox.list.chroot config/package-lists/
-  cp -f catalog/browser-torbrowser.list.chroot config/package-lists/
+  # Tor Browser / Mullvad / LibreWolf are installed best-effort by the 0250 hook
+  # (Tor Browser's launcher isn't in trixie, and the others need their own repos),
+  # so they are NOT hard package-list entries that would fail the whole build.
 
   # --- bootloader: AUTO-BOOT (finite timeout) + brand the menu as Aegis ---
   # live-build generates the GRUB/isolinux config late (after binary hooks), so a

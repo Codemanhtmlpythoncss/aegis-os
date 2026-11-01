@@ -38,6 +38,17 @@ apt-get update || true
 # Firefox ESR + uBlock are in the base list already; make sure, then the rest.
 try_install firefox-esr webext-ublock-origin-firefox
 try_install torbrowser-launcher
+# Tor Browser's launcher was dropped from trixie; fall back to the (arch-all)
+# package from Debian's pool. It still GPG-verifies the actual Tor Browser it
+# downloads on first run, so this stays the secure path. Best-effort.
+if ! dpkg -l torbrowser-launcher 2>/dev/null | grep -q '^ii'; then
+    POOL="http://deb.debian.org/debian/pool/contrib/t/torbrowser-launcher/"
+    DEB="$(curl -fsSL "$POOL" 2>/dev/null | grep -oE "torbrowser-launcher_[^\"']*_all\.deb" | sort -V | tail -1 || true)"
+    if [ -n "$DEB" ] && curl -fsSL "${POOL}${DEB}" -o /tmp/tbl.deb 2>/dev/null; then
+        apt-get install -y --no-install-recommends /tmp/tbl.deb || echo "W: [aegis] torbrowser-launcher deps unmet"
+        rm -f /tmp/tbl.deb
+    fi
+fi
 try_install mullvad-browser
 try_install librewolf
 
