@@ -19,6 +19,18 @@ MODES = [
 ]
 
 
+def helper(name):
+    """Absolute path to an aegis helper, wherever it is installed.
+    Packaged helpers live in /usr/sbin; ones still shipped via live-build
+    includes are in /usr/local/bin. pkexec needs an absolute path."""
+    import os
+    for base in ("/usr/sbin", "/usr/bin", "/usr/local/sbin", "/usr/local/bin"):
+        p = os.path.join(base, name)
+        if os.path.exists(p):
+            return p
+    return "/usr/sbin/" + name
+
+
 def run(cmd, timeout=12):
     try:
         return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
@@ -141,7 +153,7 @@ class AegisControl(Gtk.Window):
 
     def on_apply_mode(self, _btn):
         mode = next((k for k, rb in self.mode_radios.items() if rb.get_active()), "tor")
-        r = run(["pkexec", "/usr/sbin/aegis-netmode-set", mode], timeout=60)
+        r = run(["pkexec", helper("aegis-netmode-set"), mode], timeout=60)
         if r.returncode == 0:
             self.toast(f"Network mode set to {mode.upper()}.")
         else:
@@ -170,7 +182,7 @@ class AegisControl(Gtk.Window):
         return fr
 
     def on_mac(self, _btn):
-        r = run(["pkexec", "/usr/sbin/aegis-mac-spoof"], timeout=30)
+        r = run(["pkexec", helper("aegis-mac-spoof")], timeout=30)
         self.toast("MAC addresses spoofed." if r.returncode == 0
                    else f"MAC spoof failed: {r.stderr.strip() or 'cancelled'}",
                    err=(r.returncode != 0))
@@ -197,7 +209,7 @@ class AegisControl(Gtk.Window):
         resp = dlg.run()
         dlg.destroy()
         if resp == Gtk.ResponseType.OK:
-            subprocess.Popen(["pkexec", "/usr/sbin/aegis-emergency-shutdown"])
+            subprocess.Popen(["pkexec", helper("aegis-emergency-shutdown")])
 
     # ---- helpers --------------------------------------------------------
     def toast(self, text, err=False):

@@ -37,6 +37,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             live-build debootstrap xorriso squashfs-tools mtools dosfstools \
+            build-essential debhelper devscripts dpkg-dev fakeroot \
             git ca-certificates
           git config --global --add safe.directory '*'
 
@@ -101,11 +102,18 @@ jobs:
           bsdtar -C _iso -xf "$ISO" live/filesystem.squashfs 2>/dev/null || true
           if [ -f _iso/live/filesystem.squashfs ]; then
             MISSING=""
-            for s in aegis-firewall aegis-hostname aegis-apply aegis-mac-spoof aegis-ramwipe aegis-tordate aegis-media-watchdog; do
-              unsquashfs -ll _iso/live/filesystem.squashfs "usr/local/bin/$s" 2>/dev/null | grep -q "usr/local/bin/$s" || MISSING="$MISSING $s"
+            # live-build includes helpers (still in /usr/local/bin)
+            for s in aegis-hostname aegis-apply aegis-mac-spoof aegis-ramwipe aegis-tordate aegis-media-watchdog; do
+              unsquashfs -ll _iso/live/filesystem.squashfs "usr/local/bin/$s" 2>/dev/null | grep -q "usr/local/bin/$s" || MISSING="$MISSING local:$s"
             done
-            if [ -n "$MISSING" ]; then echo "PAYLOAD CHECK FAILED — aegis scripts missing from image:$MISSING"; exit 1; fi
-            echo "payload check OK: aegis helper scripts present in image"
+            # packaged backend (aegis-firewall now ships via the .deb at /usr/sbin)
+            unsquashfs -ll _iso/live/filesystem.squashfs "usr/sbin/aegis-firewall" 2>/dev/null | grep -q "usr/sbin/aegis-firewall" || MISSING="$MISSING pkg:aegis-firewall"
+            # friendly layer (GTK apps) must be installed from the .deb's
+            for s in aegis-control aegis-welcome; do
+              unsquashfs -ll _iso/live/filesystem.squashfs "usr/bin/$s" 2>/dev/null | grep -q "usr/bin/$s" || MISSING="$MISSING pkg:$s"
+            done
+            if [ -n "$MISSING" ]; then echo "PAYLOAD CHECK FAILED — missing from image:$MISSING"; exit 1; fi
+            echo "payload check OK: aegis helpers + packaged friendly layer present in image"
           else
             echo "WARN: could not extract squashfs for payload check (continuing to boot test)"
           fi

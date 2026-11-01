@@ -110,6 +110,25 @@ stage_payload() {
   else
     echo "W: live-build bootloader templates not at $BL_SRC; menu stays stock."
   fi
+
+  # --- Build the Aegis Debian packages into a staging dir (.aegis-debs) ---
+  # The friendly layer (Control Center + Welcome wizard) and the packaged backend
+  # ship as real .deb's. build_one copies these into config/packages.chroot/ right
+  # before `lb build` (after lb clean/config), and live-build installs them.
+  # This is the first step of the ISO consuming packages instead of only hooks.
+  rm -rf .aegis-debs; mkdir -p .aegis-debs
+  if [ -d packages ] && command -v dpkg-buildpackage >/dev/null 2>&1; then
+    echo "==> Building Aegis Debian packages"
+    for d in packages/*/; do
+      [ -f "${d}debian/control" ] || continue
+      ( cd "$d" && dpkg-buildpackage -us -uc -b -d )
+    done
+    mv packages/*.deb .aegis-debs/ 2>/dev/null || true
+    rm -f packages/*.changes packages/*.buildinfo 2>/dev/null || true
+    echo "I: built $(ls .aegis-debs/*.deb 2>/dev/null | wc -l) Aegis .deb(s)"
+  else
+    echo "W: dpkg-buildpackage unavailable or no packages/ — ISO built WITHOUT Aegis packages"
+  fi
 }
 
 build_one() {
@@ -167,6 +186,14 @@ mitigations=auto,nosmt"
     --iso-application "Aegis OS" \
     --iso-volume "Aegis $edition $arch" \
     "${QEMU_OPTS[@]}"
+
+  # Place the pre-built Aegis .deb's where live-build installs them. Done here
+  # (after lb clean/config) so a purge can't drop them before the build.
+  if ls .aegis-debs/*.deb >/dev/null 2>&1; then
+    rm -rf config/packages.chroot; mkdir -p config/packages.chroot
+    cp -f .aegis-debs/*.deb config/packages.chroot/
+    echo "I: $(ls config/packages.chroot/*.deb | wc -l) Aegis .deb(s) staged for install into the image"
+  fi
 
   echo "==> lb build ($arch) — this takes a while"
   lb build

@@ -30,6 +30,9 @@ config/hooks/live/
 config/includes.binary/
 config/package-lists/live
 config/package-lists/firmware*
+# Aegis .deb's are built into these by build.sh; never committed.
+config/packages.chroot/
+.aegis-debs/
 
 # --- staged by build.sh from the canonical sources (regenerated each build) ---
 config/includes.chroot/etc/aegis/build.env

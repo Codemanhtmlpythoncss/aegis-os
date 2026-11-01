@@ -24,6 +24,16 @@ MODES = [
 ]
 
 
+def helper(name):
+    """Absolute path to an aegis helper (packaged in /usr/sbin, or shipped via
+    live-build includes in /usr/local/bin). pkexec needs an absolute path."""
+    for base in ("/usr/sbin", "/usr/bin", "/usr/local/sbin", "/usr/local/bin"):
+        p = os.path.join(base, name)
+        if os.path.exists(p):
+            return p
+    return "/usr/sbin/" + name
+
+
 def already_done():
     return os.path.exists(MARKER)
 
@@ -148,9 +158,9 @@ class Welcome(Gtk.Assistant):
         self.spoof_mac = self.chk_mac.get_active()
         self.do_install = self.chk_install.get_active()
         # Apply the network mode (persist + firewall) via the privileged helper.
-        subprocess.run(["pkexec", "/usr/sbin/aegis-netmode-set", self.mode], check=False)
+        subprocess.run(["pkexec", helper("aegis-netmode-set"), self.mode], check=False)
         if self.spoof_mac:
-            subprocess.run(["pkexec", "/usr/sbin/aegis-mac-spoof"], check=False)
+            subprocess.run(["pkexec", helper("aegis-mac-spoof")], check=False)
 
     def finish(self):
         write_marker()
