@@ -6,10 +6,10 @@
 # is imported until you tick it and press Apply. That makes it safe to open a
 # vault you were handed: it can't silently rewrite your Wi-Fi or Firefox logins.
 #
-# For VeraCrypt-style HIDDEN (deniable) volumes and for browsing a vault as a
-# normal folder, this app hands off to zuluCrypt (installed), which specialises
-# in that. All privileged work is done by /usr/lib/aegis/aegis-vault-helper via
-# pkexec; passphrases are sent on the helper's stdin, never on a command line.
+# Unlocking/browsing any LUKS or VeraCrypt volume (hidden ones included) hands off
+# to Disks (gnome-disks); hidden (deniable) volumes are created with tcplay. All
+# privileged work is done by /usr/lib/aegis/aegis-vault-helper via pkexec;
+# passphrases are sent on the helper's stdin, never on a command line.
 import os
 import shutil
 import subprocess
@@ -125,16 +125,14 @@ class Vault(Gtk.Window):
 
         self.root.pack_start(Gtk.Separator(), False, False, 6)
         zhead = Gtk.Label(xalign=0)
-        zhead.set_markup(f"<small>{colored('Hidden (deniable) VeraCrypt volumes and browsing a vault as a folder are handled by zuluCrypt:', DIM)}</small>")
+        zhead.set_markup(f"<small>{colored('Unlock or browse any LUKS / VeraCrypt volume (including hidden ones) in Disks. Create hidden, deniable volumes with tcplay — see the Hardware Security guide.', DIM)}</small>")
         zhead.set_line_wrap(True)
         self.root.pack_start(zhead, False, False, 0)
         zrow = Gtk.Box(spacing=8)
-        for label, cmd in (("Create hidden volume…", "zuluCrypt-gui"),
-                           ("Browse / mount a vault…", "zuluMount-gui")):
-            b = Gtk.Button(label=label)
-            b.set_sensitive(have(cmd))
-            b.connect("clicked", lambda _w, c=cmd: subprocess.Popen([c]))
-            zrow.pack_start(b, False, False, 0)
+        disks = Gtk.Button(label="Open Disks (unlock / mount a vault)…")
+        disks.set_sensitive(have("gnome-disks"))
+        disks.connect("clicked", lambda *_: subprocess.Popen(["gnome-disks"]))
+        zrow.pack_start(disks, False, False, 0)
         self.root.pack_start(zrow, False, False, 0)
         self.show_all()
 

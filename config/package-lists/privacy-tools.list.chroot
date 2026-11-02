@@ -11,12 +11,15 @@ pwgen
 wireguard-tools
 
 # --- encrypted containers (VeraCrypt-style, Debian-native) ---
-# zulucrypt gives a GUI for LUKS / TrueCrypt / VeraCrypt volumes, including
-# HIDDEN volumes (plausible deniability). cryptsetup (in core) opens VeraCrypt
-# volumes natively with `--type tcrypt --veracrypt`. This is the foundation the
-# Aegis password vault (aegis-vault) is built on — no external VeraCrypt binary.
-zulucrypt-gui
+# gnome-disks (udisks2) gives a GUI to unlock/mount LUKS, TrueCrypt and VeraCrypt
+# volumes. cryptsetup (in core) opens VeraCrypt volumes with `--type tcrypt
+# --veracrypt`. tcplay creates & opens TrueCrypt / VeraCrypt volumes INCLUDING
+# hidden (deniable) ones from the CLI. Together these are the Debian-native
+# foundation for the Aegis password vault — no external VeraCrypt binary.
+# (zulucrypt was dropped from trixie, so it is not used.)
+gnome-disk-utility
 cryptsetup-bin
+tcplay
 
 # --- firewall manager (user-requested) ---
 # gufw is the familiar GUI firewall manager. NOTE: ufw is installed but left

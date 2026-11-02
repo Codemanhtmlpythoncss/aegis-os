@@ -5,7 +5,7 @@
 #
 # The container is "a folder as a file": an encrypted blob that, once unlocked,
 # mounts as a directory. Aegis CREATES LUKS2 (AES-256-XTS, Argon2id). It can also
-# OPEN VeraCrypt volumes — including hidden ones made with zuluCrypt for plausible
+# OPEN VeraCrypt volumes — including hidden ones made with tcplay for plausible
 # deniability. Imports NEVER run on unlock; the GUI calls apply-* only after the
 # user explicitly confirms.
 #

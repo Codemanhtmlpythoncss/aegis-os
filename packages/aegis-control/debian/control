@@ -17,7 +17,7 @@ Depends: ${misc:Depends},
          polkitd,
          cryptsetup,
          aegis-firewall (>= 1.3.0)
-Recommends: aegis-net, zulucrypt-gui
+Recommends: aegis-net, gnome-disk-utility, tcplay
 Description: Aegis OS Control Center (GTK)
  A single graphical panel to manage Aegis privacy settings: switch the network
  mode (Tor / I2P / Both / Direct), see live Tor/I2P/firewall status, spoof the

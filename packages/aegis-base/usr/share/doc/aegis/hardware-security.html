@@ -218,6 +218,23 @@
     <li class="ok">☑ Use the "maximum CPU mitigations" boot entry on high-risk hardware.</li>
   </ul>
 
+  <div class="card" id="vaults">
+    <h3 style="margin-top:0">Encrypted vaults &amp; hidden (deniable) volumes</h3>
+    <p>The <b>Aegis Vault</b> app makes a strong native container (LUKS2, AES-256-XTS,
+    Argon2id) that opens as a folder and imports Wi-Fi / files / Firefox logins only when you
+    confirm. Unlock or browse any LUKS or VeraCrypt volume (including hidden ones) in
+    <b>Disks</b> (gnome-disks).</p>
+    <p>For <b>plausible deniability</b>, make a volume that contains a hidden inner volume with
+    <code>tcplay</code> — you set two passphrases; the outer one can be revealed under coercion
+    while the real data in the hidden volume stays invisible:</p>
+    <pre><code># create an outer volume with a hidden volume inside one file
+tcplay --create --device=secret.tc --hidden
+# open the outer (or hidden) volume later, then mount it
+sudo cryptsetup --type tcrypt open secret.tc vault     # add --veracrypt for VeraCrypt-made volumes
+sudo mount /dev/mapper/vault /mnt</code></pre>
+    <p>See <code>man tcplay</code>. Keep the hidden volume's existence secret for the deniability to hold.</p>
+  </div>
+
   <footer>
     Aegis OS · This guide is general security advice, not a guarantee. Firmware flashing carries a real
     risk of bricking hardware — follow your board's official documentation. External links:

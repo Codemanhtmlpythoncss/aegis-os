@@ -14,8 +14,7 @@ mkdir -p "$SEC"
 # Every Aegis launcher, plus the third-party security tools we add. Glob patterns
 # that match nothing stay literal and are skipped by the -f test.
 for f in /usr/share/applications/aegis-*.desktop \
-         /usr/share/applications/*zuluCrypt*.desktop \
-         /usr/share/applications/*zuluMount*.desktop \
+         /usr/share/applications/org.gnome.DiskUtility.desktop \
          /usr/share/applications/*ufw*.desktop \
          /usr/share/applications/hexchat.desktop \
          /usr/share/applications/*keepassxc*.desktop \
