@@ -1,0 +1,26 @@
+#!/bin/sh
+# Brand the boot menu as Aegis and rename live-build's "fail-safe" entry to the
+# maximum-CPU-mitigations entry (that slot carries our hardened cmdline via
+# --bootappend-live-failsafe). This runs as a BINARY hook — late in `lb binary`,
+# AFTER live-build regenerates grub.cfg/isolinux — because patching the copied
+# config/bootloaders/ templates does NOT reach the final generated menu.
+set -e
+
+# The binary tree is ./binary during this stage; fall back to . just in case.
+BT=binary
+[ -d "$BT" ] || BT=.
+
+CFGS=$(find "$BT" -type f -name '*.cfg' 2>/dev/null \
+       | grep -E '/(boot/grub|isolinux|syslinux)/' || true)
+
+n=0
+for cfg in $CFGS; do
+    sed -i \
+        -e 's/Live system/Aegis OS/g' \
+        -e 's/fail-safe mode/maximum CPU mitigations/g' \
+        -e 's/fail-safe/maximum CPU mitigations/g' \
+        -e 's/failsafe/maximum CPU mitigations/g' \
+        "$cfg"
+    n=$((n + 1))
+done
+echo "I: [aegis] 9000 branded boot menu + max-mitigations label in $n config(s)"

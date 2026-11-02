@@ -1,3 +1,11 @@
+aegis-control (1.4.1) trixie; urgency=medium
+
+  * Vault: fix the passphrase being lost when the GUI pipes it without a trailing
+    newline — aegis-vault-helper's read_pass no longer clears it on EOF, so vault
+    create/unlock actually work from the GUI. (CLI-verified end to end.)
+
+ -- Aegis OS <aegis@aegis-os.localdomain>  Mon, 02 Nov 2026 13:30:00 +0000
+
 aegis-control (1.4.0) trixie; urgency=medium
 
   * Tor Connection: add an "Auto" outbound-port mode so it no longer gets stuck

@@ -1,0 +1,13 @@
+#!/bin/sh
+# ufw ships with its systemd unit enabled. Aegis's own fail-closed nftables
+# firewall (aegis-firewall) is THE firewall and forces all traffic through Tor;
+# ufw is installed only for users who explicitly choose to take over. Keep it off
+# so it can't run at boot and flush/replace the Tor ruleset. (Verified: with this,
+# `nft list tables` shows only `table inet aegis`.)
+set -e
+systemctl disable ufw 2>/dev/null || true
+# ufw.conf defaults to ENABLED=no; make certain.
+if [ -f /etc/ufw/ufw.conf ]; then
+    sed -i 's/^ENABLED=.*/ENABLED=no/' /etc/ufw/ufw.conf
+fi
+echo "I: [aegis] ufw installed but disabled (aegis-firewall remains the firewall)"

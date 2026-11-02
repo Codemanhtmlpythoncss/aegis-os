@@ -22,7 +22,10 @@ STATE=/run/aegis-vault
 MNT=$STATE/mnt
 NMDIR=/etc/NetworkManager/system-connections
 
-read_pass() { IFS= read -r VPASS || VPASS=""; }   # exactly one line from stdin
+# Read the passphrase from stdin. The GUI pipes it WITHOUT a trailing newline, so
+# read hits EOF and returns non-zero — but it still assigns what it read, so we
+# must NOT clear VPASS on that (a `|| VPASS=""` here would wipe the passphrase).
+read_pass() { IFS= read -r VPASS || true; }
 
 cmd=${1:-}
 [ $# -gt 0 ] && shift || true

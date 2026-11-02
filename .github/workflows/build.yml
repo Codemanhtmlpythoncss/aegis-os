@@ -134,6 +134,7 @@ jobs:
               unsquashfs -ll _iso/live/filesystem.squashfs "usr/bin/$s" 2>/dev/null | grep -q "usr/bin/$s" || MISSING="$MISSING pkg:$s"
             done
             unsquashfs -ll _iso/live/filesystem.squashfs "usr/sbin/ufw" 2>/dev/null | grep -q "usr/sbin/ufw" || MISSING="$MISSING pkg:ufw"
+            unsquashfs -ll _iso/live/filesystem.squashfs "usr/sbin/tcplay" 2>/dev/null | grep -q "usr/sbin/tcplay" || MISSING="$MISSING pkg:tcplay"
             if [ -n "$MISSING" ]; then echo "PAYLOAD CHECK FAILED — missing from image:$MISSING"; exit 1; fi
             echo "payload check OK: aegis helpers + packaged friendly layer present in image"
           else
