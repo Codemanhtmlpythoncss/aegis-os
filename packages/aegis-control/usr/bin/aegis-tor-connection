@@ -9,6 +9,7 @@
 import os
 import socket
 import subprocess
+import time
 
 import gi
 gi.require_version("Gtk", "3.0")
@@ -24,11 +25,20 @@ REROUTE_DROPIN = "/etc/systemd/system/aegis-reroute.timer.d/interval.conf"
 DONE_FILE = os.path.expanduser("~/.config/aegis/tor-connection-shown")
 
 PORT_PRESETS = [
+    ("auto", "Auto — keep trying until one port connects (any → 443 → 80 → 9001)"),
     ("any", "Automatic — any relay port"),
     ("443", "443 — HTTPS only (best on restrictive Wi-Fi)"),
     ("80,443", "80, 443 — web ports"),
     ("custom", "Custom…"),
 ]
+
+# Auto-fallback: locked-down networks block most outbound ports, so instead of
+# pinning one port and stalling forever, cycle through these until Tor actually
+# makes bootstrap progress. "any" first (instant on an open network), then the
+# ports a restrictive network is most likely to allow out.
+PORT_FALLBACK = ["any", "443", "80", "9001"]
+PROBE_PER_PORT = 35      # seconds to wait for progress before trying the next port
+PROGRESS_OK = 25         # bootstrap % that means "this port works — stop rotating"
 
 
 def helper(name):
@@ -148,6 +158,7 @@ class TorConnection(Gtk.Window):
         super().__init__(title="Tor Connection")
         self.set_default_size(560, 640)
         self.set_position(Gtk.WindowPosition.CENTER)
+        self._probe = None   # active port auto-fallback state, or None
 
         hb = Gtk.HeaderBar(show_close_button=True, title="Connect to Tor",
                            subtitle="Aegis · anonymity")
@@ -320,15 +331,20 @@ class TorConnection(Gtk.Window):
         self.port_entry.set_visible(key == "custom")
 
     def _preset_port(self, current):
+        # Default a fresh / unrestricted setup to Auto (the fallback prober);
+        # only show a specific preset when the user has actually pinned a port.
+        if current == "any":
+            self.port_combo.set_active(0)   # "auto"
+            self._sync_port_entry()
+            return
         idx = 0
         for i, (key, _l) in enumerate(PORT_PRESETS):
             if key == current:
                 idx = i
                 break
-        else:
-            if current != "any":            # a custom port list
-                idx = len(PORT_PRESETS) - 1
-                self.port_entry.set_text(current)
+        else:                               # a custom port list
+            idx = len(PORT_PRESETS) - 1
+            self.port_entry.set_text(current)
         self.port_combo.set_active(idx)
         self._sync_port_entry()
 
@@ -368,8 +384,15 @@ class TorConnection(Gtk.Window):
         elif bridges_enabled():
             pkexec([helper("aegis-tor-bridges"), "clear"])
 
-        # Outbound port restriction.
+        # Outbound port.
         port = self._desired_port()
+        if port == "auto":
+            # Don't stop at one port — probe through the fallback list until Tor
+            # actually bootstraps (handles restrictive networks that only let 443 out).
+            pkexec(["systemctl", "start", "tor@default.service"])
+            self._start_probe()
+            return
+        self._probe = None
         if port in ("", "any"):
             pkexec([helper("aegis-tor-port"), "any"])
         else:
@@ -380,6 +403,53 @@ class TorConnection(Gtk.Window):
         pkexec(["systemctl", "start", "tor@default.service"])
         self.state_lbl.set_markup(colored("Connecting…", TEAL))
         self.refresh()
+
+    # ---------- outbound-port auto-fallback ----------
+    def _start_probe(self):
+        self._probe = {"idx": -1, "started": 0.0, "baseline": 0}
+        self.connect_btn.set_sensitive(False)
+        self._advance_probe()
+
+    def _advance_probe(self):
+        """Apply the next candidate port; give up (suggest a bridge) when exhausted."""
+        self._probe["idx"] += 1
+        i = self._probe["idx"]
+        if i >= len(PORT_FALLBACK):
+            self._probe = None
+            self.connect_btn.set_sensitive(True)
+            self.state_lbl.set_markup(colored(
+                "Couldn't reach Tor on any port. Your network may block Tor — try a bridge.", RED))
+            return
+        cand = PORT_FALLBACK[i]
+        if cand == "any":
+            pkexec([helper("aegis-tor-port"), "any"])
+        else:
+            pkexec([helper("aegis-tor-port"), "set", cand])
+        pkexec(["systemctl", "start", "tor@default.service"])
+        pct, _ = tor_bootstrap()
+        self._probe["started"] = time.monotonic()
+        self._probe["baseline"] = max(0, pct)
+        label = "any port" if cand == "any" else f"port {cand}"
+        self.state_lbl.set_markup(colored(f"Trying {label}…", TEAL))
+
+    def _probe_step(self):
+        pct, _ = tor_bootstrap()
+        if pct >= 100:                                   # connected
+            self._probe = None
+            self.connect_btn.set_sensitive(True)
+            return
+        if pct >= PROGRESS_OK and pct > self._probe["baseline"]:
+            # Real progress on this port — keep it, stop rotating.
+            self._probe = None
+            self.connect_btn.set_sensitive(True)
+            return
+        if time.monotonic() - self._probe["started"] >= PROBE_PER_PORT:
+            self._advance_probe()                        # stalled → next port
+        else:
+            cand = PORT_FALLBACK[self._probe["idx"]]
+            label = "any port" if cand == "any" else f"port {cand}"
+            left = int(PROBE_PER_PORT - (time.monotonic() - self._probe["started"]))
+            self.state_lbl.set_markup(colored(f"Trying {label}… ({left}s)", TEAL))
 
     def on_apply_reroute(self, _b):
         if not self.rr_toggle.get_active():
@@ -424,7 +494,11 @@ class TorConnection(Gtk.Window):
             self.browse_btn.set_sensitive(False)
 
     def _tick(self):
+        # refresh() paints the bar/state from the live bootstrap %; the probe
+        # (when active) then overrides the state label with "Trying port X…".
         self.refresh()
+        if self._probe is not None:
+            self._probe_step()
         return True
 
 

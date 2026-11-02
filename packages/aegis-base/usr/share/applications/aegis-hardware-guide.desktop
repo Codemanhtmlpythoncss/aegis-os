@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Hardware Security Guide
+Comment=Libreboot & maximising hardware security — the Aegis guide
+Exec=xdg-open /usr/share/doc/aegis/hardware-security.html
+Icon=help-browser
+Terminal=false
+Categories=System;Security;Documentation;
+Keywords=libreboot;coreboot;hardware;security;firmware;tpm;me;iommu;guide;

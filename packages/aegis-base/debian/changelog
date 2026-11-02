@@ -1,3 +1,14 @@
+aegis-base (1.3.2) trixie; urgency=medium
+
+  * Add a Hardware Security & Libreboot guide (/usr/share/doc/aegis/
+    hardware-security.html) with a desktop launcher: Libreboot/coreboot, Intel
+    ME / AMD PSP, measured boot & TPM, IOMMU/DMA, radios, cold-boot / evil-maid,
+    and the maximum-CPU-mitigations boot entry.
+  * Add an I2P IRC client: a preconfigured, anonymity-safe HexChat (skel config
+    pointing at the i2pd IRC tunnel on 127.0.0.1:6668) plus a launcher.
+
+ -- Aegis OS <aegis@aegis-os.localdomain>  Mon, 02 Nov 2026 00:30:00 +0000
+
 aegis-base (1.3.1) trixie; urgency=medium
 
   * FIX the background differing per desktop: the wallpaper was only applied on

@@ -1,3 +1,17 @@
+aegis-control (1.4.0) trixie; urgency=medium
+
+  * Tor Connection: add an "Auto" outbound-port mode so it no longer gets stuck
+    on one port on restrictive networks — it probes any → 443 → 80 → 9001,
+    rotating when bootstrap stalls and keeping the first port that makes progress.
+  * Add Aegis Vault (aegis-vault + privileged aegis-vault-helper): an encrypted
+    "folder in a file" — LUKS2 (AES-256-XTS, Argon2id), and it also opens
+    VeraCrypt/hidden volumes. Unlocking only mounts it read-only and shows what's
+    inside; Wi-Fi, file and Firefox-login imports run ONLY when you tick them and
+    press Apply. Hidden (deniable) volumes and folder-browsing hand off to
+    zuluCrypt. Depends: cryptsetup; Recommends: zulucrypt-gui.
+
+ -- Aegis OS <aegis@aegis-os.localdomain>  Mon, 02 Nov 2026 00:30:00 +0000
+
 aegis-control (1.3.0) trixie; urgency=medium
 
   * Add aegis-tor-connection: a standalone, Tails-style "Connect to Tor"

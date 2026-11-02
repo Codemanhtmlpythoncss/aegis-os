@@ -12,6 +12,9 @@ obfs4proxy
 
 # --- I2P (lightweight C++ implementation) ---
 i2pd
+# I2P IRC client: HexChat, preconfigured to reach the i2pd IRC client tunnel on
+# 127.0.0.1:6668 (see /etc/i2pd/tunnels.conf and the skel HexChat config).
+hexchat
 
 # DNS resolution over the anonymity layer
 bind9-dnsutils

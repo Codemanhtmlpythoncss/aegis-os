@@ -111,7 +111,7 @@ jobs:
               unsquashfs -ll _iso/live/filesystem.squashfs "usr/sbin/$s" 2>/dev/null | grep -q "usr/sbin/$s" || MISSING="$MISSING pkg:$s"
             done
             # friendly layer (GTK apps) must be installed from the .deb's
-            for s in aegis-control aegis-welcome aegis-tor-connection; do
+            for s in aegis-control aegis-welcome aegis-tor-connection aegis-vault; do
               unsquashfs -ll _iso/live/filesystem.squashfs "usr/bin/$s" 2>/dev/null | grep -q "usr/bin/$s" || MISSING="$MISSING pkg:$s"
             done
             # screensaver: the Aegis image, the skel config, and the saver binary
@@ -124,6 +124,16 @@ jobs:
             # same Aegis image under XFCE/GNOME/KDE/i3, not each DE's own default)
             unsquashfs -ll _iso/live/filesystem.squashfs "usr/lib/aegis/aegis-set-wallpaper" 2>/dev/null | grep -q "aegis-set-wallpaper" || MISSING="$MISSING pkg:aegis-set-wallpaper"
             unsquashfs -ll _iso/live/filesystem.squashfs "etc/skel/.config/i3/config" 2>/dev/null | grep -q "i3/config" || MISSING="$MISSING asset:i3-config"
+            # security feature batch: vault helper, hardware guide, I2P IRC config,
+            # the Security desktop folder, and the preinstalled tools.
+            unsquashfs -ll _iso/live/filesystem.squashfs "usr/lib/aegis/aegis-vault-helper" 2>/dev/null | grep -q "aegis-vault-helper" || MISSING="$MISSING pkg:aegis-vault-helper"
+            unsquashfs -ll _iso/live/filesystem.squashfs "usr/share/doc/aegis/hardware-security.html" 2>/dev/null | grep -q "hardware-security.html" || MISSING="$MISSING asset:hw-guide"
+            unsquashfs -ll _iso/live/filesystem.squashfs "etc/skel/.config/hexchat/servlist.conf" 2>/dev/null | grep -q "hexchat/servlist.conf" || MISSING="$MISSING asset:hexchat-cfg"
+            unsquashfs -ll _iso/live/filesystem.squashfs "etc/skel/Desktop/Security" 2>/dev/null | grep -q "Desktop/Security" || MISSING="$MISSING asset:security-folder"
+            for s in btop hexchat gufw zuluCrypt-gui; do
+              unsquashfs -ll _iso/live/filesystem.squashfs "usr/bin/$s" 2>/dev/null | grep -q "usr/bin/$s" || MISSING="$MISSING pkg:$s"
+            done
+            unsquashfs -ll _iso/live/filesystem.squashfs "usr/sbin/ufw" 2>/dev/null | grep -q "usr/sbin/ufw" || MISSING="$MISSING pkg:ufw"
             if [ -n "$MISSING" ]; then echo "PAYLOAD CHECK FAILED — missing from image:$MISSING"; exit 1; fi
             echo "payload check OK: aegis helpers + packaged friendly layer present in image"
           else

@@ -1,0 +1,304 @@
+#!/usr/bin/python3
+# Aegis Vault — an encrypted "folder as a file" for passwords, Wi-Fi and secrets.
+#
+# The container is a real encrypted volume (Aegis creates LUKS2: AES-256-XTS,
+# Argon2id). Unlocking just mounts it read-only and shows what's inside — NOTHING
+# is imported until you tick it and press Apply. That makes it safe to open a
+# vault you were handed: it can't silently rewrite your Wi-Fi or Firefox logins.
+#
+# For VeraCrypt-style HIDDEN (deniable) volumes and for browsing a vault as a
+# normal folder, this app hands off to zuluCrypt (installed), which specialises
+# in that. All privileged work is done by /usr/lib/aegis/aegis-vault-helper via
+# pkexec; passphrases are sent on the helper's stdin, never on a command line.
+import os
+import shutil
+import subprocess
+
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, GLib  # noqa: E402
+
+HELPER = "/usr/lib/aegis/aegis-vault-helper"
+TEAL = "#2dd4bf"
+DIM = "#8b9bb4"
+RED = "#ef4444"
+
+
+def colored(text, color):
+    return f'<span foreground="{color}">{GLib.markup_escape_text(text)}</span>'
+
+
+def have(cmd):
+    return shutil.which(cmd) is not None
+
+
+class Vault(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Aegis Vault")
+        self.set_default_size(540, 520)
+        self.set_position(Gtk.WindowPosition.CENTER)
+        self.mount = None          # set once a vault is unlocked
+
+        hb = Gtk.HeaderBar(show_close_button=True, title="Aegis Vault",
+                           subtitle="encrypted passwords & secrets")
+        self.set_titlebar(hb)
+
+        self.root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.root.set_border_width(20)
+        self.add(self.root)
+        self._build_home()
+
+    # ---------- small helpers ----------
+    def _clear(self):
+        for c in self.root.get_children():
+            self.root.remove(c)
+
+    def toast(self, text, err=False):
+        d = Gtk.MessageDialog(transient_for=self, modal=True,
+                              message_type=(Gtk.MessageType.ERROR if err else Gtk.MessageType.INFO),
+                              buttons=Gtk.ButtonsType.OK, text=text)
+        d.run(); d.destroy()
+
+    def _ask_pass(self, title, confirm=False):
+        d = Gtk.Dialog(title=title, transient_for=self, modal=True)
+        d.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                      Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        box = d.get_content_area(); box.set_spacing(8); box.set_border_width(14)
+        e1 = Gtk.Entry(visibility=False, placeholder_text="Passphrase")
+        e1.set_activates_default(True)
+        box.pack_start(e1, False, False, 0)
+        e2 = None
+        if confirm:
+            e2 = Gtk.Entry(visibility=False, placeholder_text="Confirm passphrase")
+            box.pack_start(e2, False, False, 0)
+        d.set_default_response(Gtk.ResponseType.OK)
+        d.show_all()
+        pw = None
+        while True:
+            if d.run() != Gtk.ResponseType.OK:
+                break
+            p1 = e1.get_text()
+            if not p1:
+                continue
+            if confirm and p1 != e2.get_text():
+                e1.set_text(""); e2.set_text("")
+                e1.get_style_context().add_class("error")
+                continue
+            pw = p1
+            break
+        d.destroy()
+        return pw
+
+    def _run_helper(self, args, passphrase=None, timeout=180):
+        try:
+            return subprocess.run(["pkexec", HELPER] + args,
+                                  input=(passphrase if passphrase is not None else None),
+                                  capture_output=True, text=True, timeout=timeout)
+        except Exception as e:  # noqa: BLE001
+            class R:
+                returncode = 1; stdout = ""; stderr = str(e)
+            return R()
+
+    # ---------- home screen ----------
+    def _build_home(self):
+        self._clear()
+        self.mount = None
+        title = Gtk.Label(xalign=0)
+        title.set_markup("<span size='x-large' weight='bold'>Your encrypted vault</span>")
+        self.root.pack_start(title, False, False, 0)
+        sub = Gtk.Label(xalign=0); sub.set_line_wrap(True)
+        sub.set_markup(f"<small>{colored('A vault is one encrypted file that opens as a folder. Keep passwords, Wi-Fi and files inside it. Opening a vault only shows what it holds — Aegis imports nothing until you confirm.', DIM)}</small>")
+        self.root.pack_start(sub, False, False, 0)
+
+        self.root.pack_start(Gtk.Separator(), False, False, 6)
+
+        grid = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        for label, cb in (
+            ("Unlock a vault…", self.on_unlock),
+            ("Create a new vault (LUKS2)…", self.on_create),
+            ("Export my Wi-Fi into a vault…", self.on_export),
+        ):
+            btn = Gtk.Button(label=label); btn.connect("clicked", cb)
+            btn.get_style_context().add_class("suggested-action") if label.startswith("Unlock") else None
+            grid.pack_start(btn, False, False, 0)
+        self.root.pack_start(grid, False, False, 0)
+
+        self.root.pack_start(Gtk.Separator(), False, False, 6)
+        zhead = Gtk.Label(xalign=0)
+        zhead.set_markup(f"<small>{colored('Hidden (deniable) VeraCrypt volumes and browsing a vault as a folder are handled by zuluCrypt:', DIM)}</small>")
+        zhead.set_line_wrap(True)
+        self.root.pack_start(zhead, False, False, 0)
+        zrow = Gtk.Box(spacing=8)
+        for label, cmd in (("Create hidden volume…", "zuluCrypt-gui"),
+                           ("Browse / mount a vault…", "zuluMount-gui")):
+            b = Gtk.Button(label=label)
+            b.set_sensitive(have(cmd))
+            b.connect("clicked", lambda _w, c=cmd: subprocess.Popen([c]))
+            zrow.pack_start(b, False, False, 0)
+        self.root.pack_start(zrow, False, False, 0)
+        self.show_all()
+
+    # ---------- actions ----------
+    def _choose_file(self, action, title):
+        d = Gtk.FileChooserDialog(title=title, transient_for=self, action=action)
+        d.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                      Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        d.set_current_folder(os.path.expanduser("~"))
+        if action == Gtk.FileChooserAction.SAVE:
+            d.set_current_name("vault.aegis")
+        path = d.get_filename() if d.run() == Gtk.ResponseType.OK else None
+        d.destroy()
+        return path
+
+    def on_create(self, _b):
+        path = self._choose_file(Gtk.FileChooserAction.SAVE, "Create vault as…")
+        if not path:
+            return
+        # size
+        sd = Gtk.Dialog(title="Vault size", transient_for=self, modal=True)
+        sd.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        ca = sd.get_content_area(); ca.set_border_width(12); ca.set_spacing(6)
+        ca.pack_start(Gtk.Label(label="Size of the vault (MB):", xalign=0), False, False, 0)
+        spin = Gtk.SpinButton.new_with_range(10, 20000, 10); spin.set_value(50)
+        ca.pack_start(spin, False, False, 0); sd.show_all()
+        ok = sd.run() == Gtk.ResponseType.OK
+        size = int(spin.get_value()); sd.destroy()
+        if not ok:
+            return
+        pw = self._ask_pass("Set a passphrase for the new vault", confirm=True)
+        if not pw:
+            return
+        r = self._run_helper(["create", path, str(size)], passphrase=pw)
+        self.toast(f"Vault created:\n{path}" if r.returncode == 0
+                   else f"Create failed: {r.stderr.strip() or 'cancelled'}", err=(r.returncode != 0))
+
+    def on_unlock(self, _b):
+        path = self._choose_file(Gtk.FileChooserAction.OPEN, "Open a vault file")
+        if not path:
+            return
+        pw = self._ask_pass("Passphrase for this vault")
+        if not pw:
+            return
+        r = self._run_helper(["unlock", path], passphrase=pw)
+        if r.returncode != 0:
+            self.toast(f"Could not unlock: {r.stderr.strip() or 'cancelled'}", err=True)
+            return
+        info = {}; dests = []; wnames = []
+        for line in r.stdout.splitlines():
+            if "=" not in line:
+                continue
+            k, v = line.split("=", 1); k = k.strip(); v = v.strip()
+            if k == "FILEDEST":
+                dests.append(v)
+            elif k == "WIFINAME":
+                wnames.append(v)
+            else:
+                info[k] = v
+        self.mount = info.get("MOUNT")
+        self._build_unlocked(info, dests, wnames)
+
+    def _build_unlocked(self, info, dests=None, wnames=None):
+        self._clear()
+        dests = dests or []; wnames = wnames or []
+        wifi = int(info.get("WIFI", "0") or 0)
+        files = int(info.get("FILES", "0") or 0)
+        ffx = info.get("FIREFOX", "0") == "1"
+
+        t = Gtk.Label(xalign=0)
+        t.set_markup("<span size='large' weight='bold'>Vault unlocked</span>")
+        self.root.pack_start(t, False, False, 0)
+        note = Gtk.Label(xalign=0); note.set_line_wrap(True)
+        note.set_markup(f"<small>{colored('Tick what you want to bring into this machine, then Apply. Nothing changes until you do.', DIM)}</small>")
+        self.root.pack_start(note, False, False, 0)
+        self.root.pack_start(Gtk.Separator(), False, False, 6)
+
+        self.cb_wifi = Gtk.CheckButton(label=f"Import {wifi} Wi-Fi network(s)")
+        self.cb_wifi.set_sensitive(wifi > 0); self.cb_wifi.set_active(wifi > 0)
+        self.cb_files = Gtk.CheckButton(label=f"Copy {files} file(s) to their saved locations")
+        self.cb_files.set_sensitive(files > 0); self.cb_files.set_active(files > 0)
+        self.cb_ffx = Gtk.CheckButton(label="Import Firefox logins (opens about:logins)")
+        self.cb_ffx.set_sensitive(ffx); self.cb_ffx.set_active(False)
+
+        def _detail(s):
+            lbl = Gtk.Label(xalign=0); lbl.set_line_wrap(True); lbl.set_margin_start(26)
+            lbl.set_markup(f"<small>{colored(s, DIM)}</small>")
+            return lbl
+
+        def _summary(prefix, items):
+            return prefix + ", ".join(items[:12]) + ("…" if len(items) > 12 else "")
+
+        self.root.pack_start(self.cb_wifi, False, False, 0)
+        if wnames:
+            self.root.pack_start(_detail(_summary("Networks: ", wnames)), False, False, 0)
+        self.root.pack_start(self.cb_files, False, False, 0)
+        if dests:
+            # Show exactly where files would be written — informed consent.
+            self.root.pack_start(_detail(_summary("Writes to: ", dests)), False, False, 0)
+        self.root.pack_start(self.cb_ffx, False, False, 0)
+        if not (wifi or files or ffx):
+            empty = Gtk.Label(xalign=0)
+            empty.set_markup(f"<small>{colored('This vault has no importable items (no wifi/, files.list or firefox-logins.csv).', DIM)}</small>")
+            self.root.pack_start(empty, False, False, 0)
+
+        self.root.pack_start(Gtk.Separator(), False, False, 6)
+        row = Gtk.Box(spacing=8)
+        apply_b = Gtk.Button(label="Apply selected")
+        apply_b.get_style_context().add_class("suggested-action")
+        apply_b.connect("clicked", self.on_apply)
+        lock_b = Gtk.Button(label="Lock & close")
+        lock_b.connect("clicked", self.on_lock)
+        row.pack_start(apply_b, False, False, 0)
+        row.pack_end(lock_b, False, False, 0)
+        self.root.pack_start(row, False, False, 0)
+        self.show_all()
+
+    def on_apply(self, _b):
+        msgs = []
+        err = False
+        if self.cb_wifi.get_active() and self.cb_wifi.get_sensitive():
+            r = self._run_helper(["apply-wifi"]); msgs.append(r.stdout.strip() or r.stderr.strip()); err |= r.returncode != 0
+        if self.cb_files.get_active() and self.cb_files.get_sensitive():
+            r = self._run_helper(["apply-files"]); msgs.append(r.stdout.strip() or r.stderr.strip()); err |= r.returncode != 0
+        if self.cb_ffx.get_active() and self.cb_ffx.get_sensitive():
+            dest = os.path.expanduser("~/.cache/aegis-firefox-logins.csv")
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            r = self._run_helper(["firefox-csv", dest])
+            if r.returncode == 0:
+                msgs.append(f"Firefox logins staged at {dest} — importing in Firefox…")
+                subprocess.Popen(["sh", "-c",
+                                  "firefox about:logins || firefox-esr about:logins || true"])
+            else:
+                err = True; msgs.append(r.stderr.strip() or "Firefox staging failed")
+        self.toast(("\n".join(m for m in msgs if m)) or "Nothing selected.", err=err)
+
+    def on_lock(self, _b):
+        self._run_helper(["lock"])
+        self._build_home()
+
+    def on_export(self, _b):
+        path = self._choose_file(Gtk.FileChooserAction.OPEN,
+                                 "Choose an existing LUKS vault to add your Wi-Fi to")
+        if not path:
+            return
+        pw = self._ask_pass("Passphrase for this vault")
+        if not pw:
+            return
+        r = self._run_helper(["export-wifi", path], passphrase=pw)
+        self.toast(r.stdout.strip() if r.returncode == 0
+                   else f"Export failed: {r.stderr.strip() or 'cancelled'}", err=(r.returncode != 0))
+
+
+def main():
+    if not os.path.exists(HELPER):
+        print("aegis-vault-helper missing", flush=True)
+    win = Vault()
+    win.connect("destroy", Gtk.main_quit)
+    # Best-effort: lock any stale mount from a previous run on close.
+    win.connect("destroy", lambda *_: subprocess.run(
+        ["pkexec", HELPER, "lock"], capture_output=True) if os.path.exists("/run/aegis-vault/mnt") else None)
+    win.show_all()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()

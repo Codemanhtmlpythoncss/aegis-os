@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Aegis Vault
+Comment=Encrypted vault for passwords, Wi-Fi and secrets — a folder inside one file
+Exec=aegis-vault
+Icon=security-high
+Terminal=false
+Categories=System;Security;Utility;
+Keywords=vault;password;encrypt;luks;veracrypt;secrets;wifi;hidden;

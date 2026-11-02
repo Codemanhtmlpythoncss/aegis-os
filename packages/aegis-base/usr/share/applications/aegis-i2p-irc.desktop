@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=I2P IRC
+Comment=Anonymous IRC on the I2P network (ilita) via HexChat over the i2pd tunnel
+Exec=hexchat
+Icon=hexchat
+Terminal=false
+Categories=Network;IRCClient;Security;
+Keywords=i2p;irc;chat;hexchat;anonymous;ilita;

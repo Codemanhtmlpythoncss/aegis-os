@@ -1,3 +1,9 @@
+aegis-welcome (1.2.1) trixie; urgency=medium
+
+  * Finish page links the new Hardware Security & Libreboot guide.
+
+ -- Aegis OS <aegis@aegis-os.localdomain>  Mon, 02 Nov 2026 00:30:00 +0000
+
 aegis-welcome (1.2.0) trixie; urgency=medium
 
   * Initial release: GTK first-boot welcome wizard (network mode + MAC +

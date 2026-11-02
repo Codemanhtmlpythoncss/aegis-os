@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aegis — Hardware Security &amp; Libreboot Guide</title>
+<style>
+  :root{
+    --bg:#0b1120; --panel:#0f1b30; --panel2:#132340; --ink:#e6edf6;
+    --dim:#9fb0c8; --teal:#2dd4bf; --teal-dim:#1f3b3a; --line:#1e2d4a;
+    --warn:#fca5a5; --warn-bg:#2a1414; --ok:#86efac;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:32px 20px 80px}
+  header{display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--line);
+    padding-bottom:20px;margin-bottom:8px}
+  .shield{width:52px;height:52px;flex:0 0 auto}
+  h1{font-size:26px;margin:0}
+  .sub{color:var(--dim);font-size:14px;margin-top:2px}
+  h2{font-size:20px;margin:34px 0 8px;color:#fff;border-left:3px solid var(--teal);
+    padding-left:10px}
+  h3{font-size:16px;margin:20px 0 4px;color:var(--teal)}
+  p,li{color:var(--ink)}
+  a{color:var(--teal)}
+  code{background:#0a1526;border:1px solid var(--line);border-radius:4px;
+    padding:1px 5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+  pre{background:#0a1526;border:1px solid var(--line);border-radius:8px;padding:12px 14px;
+    overflow:auto}
+  pre code{border:0;background:none;padding:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:16px 20px;margin:14px 0}
+  .tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:14px 0}
+  .tier{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .tier h3{margin-top:0}
+  .warn{background:var(--warn-bg);border:1px solid #7f1d1d;border-radius:10px;
+    padding:12px 16px;color:#ffd9d9;margin:14px 0}
+  .warn b{color:var(--warn)}
+  .ok{color:var(--ok)}
+  .toc{columns:2;column-gap:28px;font-size:14px;margin:6px 0 10px}
+  .toc a{display:block;padding:3px 0;color:var(--dim);text-decoration:none}
+  .toc a:hover{color:var(--teal)}
+  ul{padding-left:20px}
+  .lead{color:var(--dim);font-size:15px}
+  footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);
+    color:var(--dim);font-size:13px}
+  @media (max-width:560px){.toc{columns:1}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <svg class="shield" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M50 6 L90 22 V58 C90 86 72 104 50 114 C28 104 10 86 10 58 V22 Z"
+            fill="#101a2c" stroke="#2dd4bf" stroke-width="5"/>
+      <path d="M34 78 L50 36 L66 78" fill="none" stroke="#2dd4bf" stroke-width="8"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="41" y1="62" x2="59" y2="62" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <h1>Hardware Security &amp; Libreboot</h1>
+      <div class="sub">Aegis OS · hardening your machine below the operating system</div>
+    </div>
+  </header>
+
+  <p class="lead">Aegis protects what happens <em>inside</em> the running system. But an
+  attacker with physical access — or a backdoor in the firmware — sits <em>below</em> it.
+  This guide covers maximising hardware security: free firmware (Libreboot/coreboot),
+  neutralising the Intel ME / AMD PSP, boot integrity, IOMMU/DMA protection, radios and
+  sensors, and defending against cold-boot and "evil-maid" attacks.</p>
+
+  <div class="card">
+    <strong>Jump to</strong>
+    <nav class="toc">
+      <a href="#threat">1. What this defends against</a>
+      <a href="#libreboot">2. Libreboot &amp; coreboot</a>
+      <a href="#me">3. Intel ME / AMD PSP</a>
+      <a href="#boot">4. Boot integrity (Secure/Measured boot, TPM)</a>
+      <a href="#bios">5. Firmware/BIOS passwords</a>
+      <a href="#iommu">6. IOMMU &amp; DMA protection</a>
+      <a href="#radios">7. Radios, camera &amp; mic</a>
+      <a href="#coldboot">8. Cold-boot &amp; evil-maid</a>
+      <a href="#cpu">9. CPU mitigations (RETBleed &amp;c.)</a>
+      <a href="#firewall">10. Firewall note (gufw/ufw)</a>
+      <a href="#checklist">11. Quick checklist</a>
+    </nav>
+  </div>
+
+  <h2 id="threat">1. What this defends against</h2>
+  <p>Aegis is amnesic and routes everything through Tor, so it is strong against
+  <em>remote</em> and <em>post-mortem</em> analysis. Hardware hardening adds defence against:</p>
+  <ul>
+    <li><b>Firmware backdoors / implants</b> — proprietary BIOS, Intel ME, AMD PSP run
+      below the OS with full memory access and their own network paths.</li>
+    <li><b>Evil-maid attacks</b> — someone with brief physical access tampering with your
+      bootloader or firmware while you're away.</li>
+    <li><b>DMA attacks</b> — malicious Thunderbolt/PCIe/USB devices reading RAM directly.</li>
+    <li><b>Cold-boot attacks</b> — recovering keys from RAM after power-off.</li>
+  </ul>
+  <div class="tiers">
+    <div class="tier"><h3>Tier 1 — everyone</h3>Firmware password, boot order locked,
+      disable unused radios, full-disk encryption, use the amnesic live session.</div>
+    <div class="tier"><h3>Tier 2 — serious</h3>Measured boot / TPM, IOMMU on, USBGuard,
+      the "maximum CPU mitigations" boot entry, tamper-evidence (glitter nail polish on screws).</div>
+    <div class="tier"><h3>Tier 3 — maximal</h3>Libreboot/coreboot with a neutralised ME/PSP,
+      a supported laptop (e.g. ThinkPad X230/T440p), external SPI flashing, Heads firmware.</div>
+  </div>
+
+  <h2 id="libreboot">2. Libreboot &amp; coreboot</h2>
+  <p><b>Libreboot</b> is a free/libre boot firmware (a coreboot distribution) that replaces
+  your proprietary BIOS/UEFI. It removes a huge amount of closed, unauditable code that runs
+  before your OS — and on supported machines it ships with the Intel ME already disabled/neutralised.</p>
+  <div class="warn"><b>Flashing firmware can brick your machine.</b> A failed flash may need an
+  external SPI programmer (e.g. a CH341A clip) to recover. Read your exact board's page end to
+  end first, and have a recovery plan. Do this on a machine you can afford to lose.</div>
+  <h3>Is my machine supported?</h3>
+  <p>Check the hardware list at <a href="https://libreboot.org/docs/hardware/">libreboot.org/docs/hardware</a>.
+  Classic well-supported targets: ThinkPad X200/X230/T400/T440p, some desktops. Modern laptops
+  with Boot Guard fused on generally <em>cannot</em> run coreboot/Libreboot.</p>
+  <h3>Rough process</h3>
+  <ul>
+    <li>Confirm the exact model/variant and flash chip.</li>
+    <li>Back up your current firmware (ideally twice) with <code>flashrom</code> before writing.</li>
+    <li>Internal flashing where supported; otherwise external SPI with a clip.</li>
+    <li>Consider <a href="https://osresearch.net/">Heads</a> on top for TPM-measured, tamper-evident boot.</li>
+  </ul>
+  <p>Full instructions: <a href="https://libreboot.org/docs/install/">libreboot.org/docs/install</a>
+  · coreboot: <a href="https://www.coreboot.org/">coreboot.org</a>.</p>
+
+  <h2 id="me">3. Intel ME / AMD PSP</h2>
+  <p>The <b>Intel Management Engine</b> (and AMD's <b>PSP</b>) is a separate processor inside your
+  chipset that runs signed, proprietary code with access to memory and the network, even when the
+  machine is "off". You cannot fully remove it, but on many platforms you can neutralise most of it.</p>
+  <ul>
+    <li>Libreboot/coreboot builds can run <code>me_cleaner</code> to strip the ME to a minimal stub
+      (<a href="https://github.com/corna/me_cleaner">github.com/corna/me_cleaner</a>).</li>
+    <li>Prefer hardware old enough to survive ME neutralisation (Sandy/Ivy Bridge era) if this is a priority.</li>
+    <li>On AMD, PSP removal is far less mature — treat it as not solved.</li>
+  </ul>
+
+  <h2 id="boot">4. Boot integrity — Secure Boot, Measured Boot, TPM</h2>
+  <p>Goal: detect or prevent tampering with the firmware/bootloader (evil-maid).</p>
+  <ul>
+    <li><b>Measured boot + TPM</b> is stronger than Secure Boot for this: the firmware hashes each
+      stage into TPM PCRs; a changed bootloader changes the measurement and the TPM refuses to
+      release your secret (or shows a different value). <a href="https://osresearch.net/">Heads</a>
+      implements this with a visible verification.</li>
+    <li><b>Secure Boot</b> (UEFI) blocks unsigned bootloaders. Useful, but you must enrol your own
+      keys to get real benefit, and it doesn't protect against a firmware-level implant.</li>
+    <li>Check TPM presence: <code>ls /sys/class/tpm</code>. Inspect PCRs with <code>tpm2_pcrread</code>.</li>
+  </ul>
+
+  <h2 id="bios">5. Firmware / BIOS passwords</h2>
+  <ul>
+    <li>Set a <b>supervisor/admin</b> firmware password and lock the boot order to internal media only.</li>
+    <li>Disable booting from USB/network in firmware when you're not installing.</li>
+    <li>Know the limits: on many laptops the password can be reset by clearing the CMOS/EC or reading an
+      EEPROM — it deters casual access, not a determined attacker with the machine open. Libreboot + a
+      GRUB password + measured boot is the stronger story.</li>
+  </ul>
+
+  <h2 id="iommu">6. IOMMU &amp; DMA protection</h2>
+  <p>A malicious Thunderbolt/PCIe/ExpressCard/FireWire device can read and write RAM directly unless the
+  IOMMU confines it. Aegis already boots with <code>intel_iommu=on amd_iommu=on efi=disable_early_pci_dma</code>.</p>
+  <ul>
+    <li>Verify: <code>dmesg | grep -i -e DMAR -e IOMMU</code> should show the IOMMU enabled.</li>
+    <li>Prefer machines without Thunderbolt, or disable Thunderbolt/"security level" in firmware.</li>
+    <li>Aegis ships <b>USBGuard</b> — authorise only the USB devices you expect, block the rest.</li>
+  </ul>
+
+  <h2 id="radios">7. Radios, camera &amp; microphone</h2>
+  <ul>
+    <li>Kill radios you aren't using: <code>rfkill block wifi bluetooth</code> (Aegis includes <code>rfkill</code>).</li>
+    <li>For real guarantees, remove/disable the Wi-Fi/BT card, use a hardware kill switch, or a
+      Faraday pouch.</li>
+    <li>Camera/mic: a physical shutter/tape for the camera; unplug or physically disable internal mics
+      where you can. Software muting is not a guarantee.</li>
+    <li>MAC address: Aegis randomises it per connection (see the Control Center), so the hardware
+      address isn't broadcast.</li>
+  </ul>
+
+  <h2 id="coldboot">8. Cold-boot &amp; evil-maid</h2>
+  <ul>
+    <li><b>Cold-boot:</b> encryption keys live in RAM while running. Aegis wipes RAM on shutdown
+      (<code>aegis-ramwipe</code>) and boots with <code>init_on_free=1 page_poison=1</code>. Prefer a
+      full shutdown over suspend; soldered RAM is harder to transplant than DIMMs.</li>
+    <li><b>Evil-maid:</b> combine measured boot (Heads) with physical tamper-evidence — unique glitter
+      nail polish over the case screws, photographed; tamper-evident seals; keep the machine with you.</li>
+  </ul>
+
+  <h2 id="cpu">9. CPU mitigations (RETBleed &amp;c.)</h2>
+  <p>Aegis boots by default with <code>mitigations=auto,nosmt</code>, which enables the appropriate
+  speculative-execution mitigations (RETBleed included) and disables SMT/Hyper-Threading.</p>
+  <p>For the strongest tier, choose <b>“Aegis OS (maximum CPU mitigations)”</b> from the boot menu. It
+  forces <code>mitigations=full,nosmt retbleed=auto spec_rstack_overflow=safe-ret
+  gather_data_sampling=force l1tf=full,force</code>. This costs performance — use it on shared or
+  high-risk hardware.</p>
+  <p>Check what's active: <code>cat /proc/cmdline</code> and
+  <code>grep . /sys/devices/system/cpu/vulnerabilities/*</code>.</p>
+
+  <h2 id="firewall">10. Firewall note — gufw / ufw</h2>
+  <div class="warn">Aegis ships <b>gufw</b> and <b>ufw</b> because they're familiar, but
+  <b>ufw is left disabled on purpose</b>. Aegis's own fail-closed nftables firewall forces every
+  packet through Tor. <b>Enabling ufw flushes and replaces that ruleset</b>, which can break the Tor
+  anonymity guarantee and leak traffic. Manage the firewall through the <b>Aegis Control Center</b>.
+  Only enable ufw if you understand you are taking over from the fail-closed firewall.</div>
+
+  <h2 id="checklist">11. Quick checklist</h2>
+  <ul>
+    <li class="ok">☑ Firmware supervisor password set; boot locked to internal disk.</li>
+    <li class="ok">☑ Unused radios off (<code>rfkill</code>); camera shutter on.</li>
+    <li class="ok">☑ IOMMU verified; USBGuard authorising only known devices.</li>
+    <li class="ok">☑ Full shutdown (RAM wiped), not suspend, when leaving the machine.</li>
+    <li class="ok">☑ Tamper-evidence on the case; machine kept with you.</li>
+    <li class="ok">☑ Consider Libreboot/coreboot + me_cleaner + Heads on supported hardware.</li>
+    <li class="ok">☑ Use the "maximum CPU mitigations" boot entry on high-risk hardware.</li>
+  </ul>
+
+  <footer>
+    Aegis OS · This guide is general security advice, not a guarantee. Firmware flashing carries a real
+    risk of bricking hardware — follow your board's official documentation. External links:
+    <a href="https://libreboot.org/">libreboot.org</a> ·
+    <a href="https://www.coreboot.org/">coreboot.org</a> ·
+    <a href="https://osresearch.net/">Heads</a> ·
+    <a href="https://github.com/corna/me_cleaner">me_cleaner</a>.
+  </footer>
+</div>
+</body>
+</html>

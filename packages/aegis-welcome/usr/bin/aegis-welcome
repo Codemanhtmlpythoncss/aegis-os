@@ -147,6 +147,12 @@ class Welcome(Gtk.Assistant):
         box.pack_start(body, False, False, 0)
         self.chk_install = Gtk.CheckButton(label="Install Aegis to disk when I finish")
         box.pack_start(self.chk_install, False, False, 0)
+        # Pointer to the hardware-hardening guide (Libreboot, ME, TPM, IOMMU, …).
+        guide_btn = Gtk.Button(label="Read the Hardware Security & Libreboot guide")
+        guide_btn.set_halign(Gtk.Align.START)
+        guide_btn.connect("clicked", lambda *_: subprocess.Popen(
+            ["xdg-open", "/usr/share/doc/aegis/hardware-security.html"]))
+        box.pack_start(guide_btn, False, False, 6)
         self.append_page(box)
         self.set_page_type(box, Gtk.AssistantPageType.CONFIRM)
         self.set_page_title(box, "Finish")

@@ -14,3 +14,8 @@ etc/skel/.xscreensaver etc/skel/
 usr/bin/aegis-switch-de usr/bin/
 usr/lib/aegis/aegis-apply-de usr/lib/aegis/
 usr/share/applications/aegis-switch-de.desktop usr/share/applications/
+usr/share/doc/aegis/hardware-security.html usr/share/doc/aegis/
+usr/share/applications/aegis-hardware-guide.desktop usr/share/applications/
+etc/skel/.config/hexchat/servlist.conf etc/skel/.config/hexchat/
+etc/skel/.config/hexchat/hexchat.conf etc/skel/.config/hexchat/
+usr/share/applications/aegis-i2p-irc.desktop usr/share/applications/

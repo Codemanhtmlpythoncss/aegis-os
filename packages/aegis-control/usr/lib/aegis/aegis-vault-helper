@@ -1,0 +1,164 @@
+#!/bin/sh
+# aegis-vault-helper — privileged backend for the Aegis password vault.
+# Invoked via pkexec by /usr/bin/aegis-vault. It owns everything that needs root:
+# creating/opening the encrypted container and writing system files (Wi-Fi).
+#
+# The container is "a folder as a file": an encrypted blob that, once unlocked,
+# mounts as a directory. Aegis CREATES LUKS2 (AES-256-XTS, Argon2id). It can also
+# OPEN VeraCrypt volumes — including hidden ones made with zuluCrypt for plausible
+# deniability. Imports NEVER run on unlock; the GUI calls apply-* only after the
+# user explicitly confirms.
+#
+# SECURITY: passphrases arrive on STDIN only, never on the command line. The mount
+# is read-only. The GUI never touches the mount directly — this helper inventories
+# it and performs the copies, so secrets stay in root-owned space.
+set -eu
+
+[ "$(id -u)" = 0 ] || { echo "aegis-vault-helper: must run as root" >&2; exit 1; }
+
+MAP=aegis-vault
+MAPDEV=/dev/mapper/$MAP
+STATE=/run/aegis-vault
+MNT=$STATE/mnt
+NMDIR=/etc/NetworkManager/system-connections
+
+read_pass() { IFS= read -r VPASS || VPASS=""; }   # exactly one line from stdin
+
+cmd=${1:-}
+[ $# -gt 0 ] && shift || true
+
+case "$cmd" in
+  create)
+    cont=${1:?container path}; size=${2:?size in MB}
+    [ -e "$cont" ] && { echo "refuse: $cont already exists" >&2; exit 2; }
+    case "$size" in ''|*[!0-9]*) echo "bad size" >&2; exit 2 ;; esac
+    read_pass
+    [ -n "$VPASS" ] || { echo "empty passphrase" >&2; exit 2; }
+    dd if=/dev/zero of="$cont" bs=1M count="$size" status=none
+    printf '%s' "$VPASS" | cryptsetup luksFormat --type luks2 \
+        --cipher aes-xts-plain64 --key-size 512 --pbkdf argon2id \
+        --batch-mode "$cont" --key-file=-
+    printf '%s' "$VPASS" | cryptsetup open --type luks "$cont" "$MAP" --key-file=-
+    mkfs.ext4 -q -L AEGISVAULT "$MAPDEV"
+    mkdir -p "$MNT"; mount "$MAPDEV" "$MNT"
+    mkdir -p "$MNT/wifi"
+    cat > "$MNT/README.txt" <<'EOF'
+Aegis vault — a folder that lives inside one encrypted file.
+Put things here; Aegis imports them ONLY when you open the vault and click Apply:
+  wifi/*.nmconnection   Wi-Fi networks to add to this machine
+  files.list            lines "SRC|DEST" — copy SRC (relative) to DEST (absolute)
+  firefox-logins.csv    Firefox logins (guided import via about:logins)
+EOF
+    sync; umount "$MNT"; cryptsetup close "$MAP"
+    echo "created $cont"
+    ;;
+
+  unlock)
+    cont=${1:?container path}
+    read_pass
+    mkdir -p "$STATE"; chmod 700 "$STATE"; mkdir -p "$MNT"
+    if printf '%s' "$VPASS" | cryptsetup open --type luks "$cont" "$MAP" --key-file=- 2>/dev/null; then
+      :
+    elif printf '%s' "$VPASS" | cryptsetup open --type tcrypt --veracrypt "$cont" "$MAP" 2>/dev/null; then
+      :
+    else
+      echo "unlock failed (wrong passphrase, or not a LUKS/VeraCrypt volume)" >&2; exit 3
+    fi
+    mount -o ro "$MAPDEV" "$MNT" 2>/dev/null || { cryptsetup close "$MAP" 2>/dev/null; echo "mount failed" >&2; exit 4; }
+    printf '%s\n' "$cont" > "$STATE/container"
+    w=$(find "$MNT/wifi" -maxdepth 1 -name '*.nmconnection' 2>/dev/null | wc -l | tr -d ' ')
+    f=0; [ -f "$MNT/files.list" ] && f=$(grep -c '|' "$MNT/files.list" 2>/dev/null || echo 0)
+    x=0; [ -f "$MNT/firefox-logins.csv" ] && x=1
+    echo "WIFI=$w"; echo "FILES=$f"; echo "FIREFOX=$x"; echo "MOUNT=$MNT"
+    # Informed-consent preview: the exact names/destinations the GUI will show,
+    # so the user sees what Apply would do before choosing it.
+    for f2 in "$MNT"/wifi/*.nmconnection; do
+      [ -f "$f2" ] && echo "WIFINAME=$(basename "$f2" .nmconnection)"
+    done
+    if [ -f "$MNT/files.list" ]; then
+      while IFS='|' read -r s d; do
+        [ -n "${d:-}" ] || continue
+        case "$d" in /home/*) : ;; *) continue ;; esac
+        echo "FILEDEST=$d"
+      done < "$MNT/files.list"
+    fi
+    ;;
+
+  apply-wifi)
+    [ -d "$MNT/wifi" ] || { echo "not unlocked" >&2; exit 2; }
+    mkdir -p "$NMDIR"; n=0
+    for f in "$MNT"/wifi/*.nmconnection; do
+      [ -f "$f" ] || continue
+      # Containment: never follow a symlink out of the vault (a hostile vault
+      # could symlink to /etc/shadow etc.). The resolved path must stay inside.
+      real=$(readlink -f "$f" 2>/dev/null) || continue
+      case "$real" in "$MNT"/*) : ;; *) continue ;; esac
+      [ -f "$real" ] || continue
+      install -m 600 -o root -g root "$real" "$NMDIR/$(basename "$f")"
+      n=$((n+1))
+    done
+    nmcli connection reload 2>/dev/null || systemctl reload NetworkManager 2>/dev/null || true
+    echo "imported $n Wi-Fi connection(s)"
+    ;;
+
+  apply-files)
+    [ -f "$MNT/files.list" ] || { echo "copied 0 file(s)"; exit 0; }
+    n=0
+    while IFS='|' read -r src dest; do
+      [ -n "${src:-}" ] && [ -n "${dest:-}" ] || continue
+      # Harden against a hostile vault: SRC must stay inside the vault (no absolute
+      # path, no ".." traversal), and DEST is confined to /home so a manifest can
+      # never make us overwrite system files as root. Both reject "..".
+      case "$src"  in /*|*..*) continue ;; esac
+      case "$dest" in /home/*) : ;; *) continue ;; esac
+      case "$dest" in *..*) continue ;; esac
+      # Resolve the source and require it to stay inside the vault — blocks a
+      # symlink (final or via an intermediate dir) escaping to root-only files.
+      s="$MNT/$src"
+      real=$(readlink -f "$s" 2>/dev/null) || continue
+      case "$real" in "$MNT"/*) : ;; *) continue ;; esac
+      [ -f "$real" ] || continue
+      mkdir -p "$(dirname "$dest")"; cp -f "$real" "$dest"; n=$((n+1))
+    done < "$MNT/files.list"
+    echo "copied $n file(s)"
+    ;;
+
+  firefox-csv)
+    out=${1:?destination path}
+    case "$out" in /home/*) : ;; *) echo "refuse: dest must be under /home" >&2; exit 2 ;; esac
+    case "$out" in *..*) echo "refuse: .. in dest" >&2; exit 2 ;; esac
+    src="$MNT/firefox-logins.csv"
+    real=$(readlink -f "$src" 2>/dev/null) || { echo "no csv in vault" >&2; exit 0; }
+    case "$real" in "$MNT"/*) : ;; *) echo "refuse: csv escapes vault" >&2; exit 2 ;; esac
+    [ -f "$real" ] || { echo "no csv in vault" >&2; exit 0; }
+    cp -f "$real" "$out"; chmod 600 "$out"
+    chown "${PKEXEC_UID:-1000}:${PKEXEC_UID:-1000}" "$out" 2>/dev/null || true
+    echo "staged $out"
+    ;;
+
+  export-wifi)
+    cont=${1:?container path}
+    read_pass
+    printf '%s' "$VPASS" | cryptsetup open --type luks "$cont" "$MAP" --key-file=- 2>/dev/null \
+      || { echo "open failed" >&2; exit 3; }
+    mkdir -p "$MNT"; mount "$MAPDEV" "$MNT"; mkdir -p "$MNT/wifi"; n=0
+    for f in "$NMDIR"/*.nmconnection; do
+      [ -f "$f" ] || continue
+      cp -f "$f" "$MNT/wifi/"; n=$((n+1))
+    done
+    sync; umount "$MNT"; cryptsetup close "$MAP"
+    echo "exported $n Wi-Fi connection(s)"
+    ;;
+
+  lock)
+    umount "$MNT" 2>/dev/null || true
+    cryptsetup close "$MAP" 2>/dev/null || true
+    rm -rf "$STATE"
+    echo "locked"
+    ;;
+
+  *)
+    echo "usage: aegis-vault-helper {create|unlock|apply-wifi|apply-files|firefox-csv|export-wifi|lock}" >&2
+    exit 2
+    ;;
+esac

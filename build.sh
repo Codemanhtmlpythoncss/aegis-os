@@ -110,10 +110,11 @@ stage_payload() {
       [ -f "$c" ] || continue
       sed -i 's/^timeout .*/timeout 50/; s/^prompt .*/prompt 0/' "$c"
     done
-    # Brand the visible menu text (both GRUB and isolinux).
-    find config/bootloaders -name '*.cfg' -type f -exec \
-      sed -i 's/Live system/Aegis OS/g; s@Debian GNU/Linux@Aegis OS@g; s/Debian Live/Aegis OS/g; s/\bDebian\b/Aegis/g' {} +
-    echo "I: staged custom bootloaders (auto-boot timeout + Aegis branding)"
+    # Brand the visible menu text (both GRUB and isolinux) and rename live-build's
+    # "(failsafe)" entry — we repurpose that slot as the maximum-CPU-mitigations boot.
+    find config/bootloaders -type f \( -name '*.cfg' -o -name '*.cfg.in' \) -exec \
+      sed -i 's/Live system/Aegis OS/g; s@Debian GNU/Linux@Aegis OS@g; s/Debian Live/Aegis OS/g; s/\bDebian\b/Aegis/g; s/(failsafe)/(maximum CPU mitigations)/g' {} +
+    echo "I: staged custom bootloaders (auto-boot timeout + Aegis branding + max-mitigations entry)"
   else
     echo "W: live-build bootloader templates not at $BL_SRC; menu stays stock."
   fi
@@ -175,6 +176,15 @@ lockdown=confidentiality mce=0 ipv6.disable=1 \
 intel_iommu=on amd_iommu=on efi=disable_early_pci_dma \
 mitigations=auto,nosmt"
 
+  # Second boot entry — "maximum CPU mitigations" (reuses live-build's failsafe
+  # slot, renamed in the menu above). The default entry already has
+  # mitigations=auto,nosmt (RETBleed is handled); this tier forces the strongest
+  # known speculative-execution mitigations for people who want them, at a
+  # performance cost. SMT stays off; adds explicit RETBleed/SRSO/GDS/L1TF knobs.
+  local HARDENED_APPEND="$BOOTAPPEND mitigations=full,nosmt retbleed=auto \
+spec_rstack_overflow=safe-ret gather_data_sampling=force l1tf=full,force \
+kvm.nx_huge_pages=force"
+
   echo "==> lb config ($arch)"
   lb clean --purge >/dev/null 2>&1 || true
   lb config \
@@ -187,6 +197,7 @@ mitigations=auto,nosmt"
     --debian-installer none \
     --bootloaders "$BOOTLOADERS" \
     --bootappend-live "$BOOTAPPEND" \
+    --bootappend-live-failsafe "$HARDENED_APPEND" \
     --apt-recommends false \
     --apt-indices false \
     --memtest none \

@@ -9,3 +9,19 @@ scrot
 pwgen
 # optional VPN client for layering (WireGuard)
 wireguard-tools
+
+# --- encrypted containers (VeraCrypt-style, Debian-native) ---
+# zulucrypt gives a GUI for LUKS / TrueCrypt / VeraCrypt volumes, including
+# HIDDEN volumes (plausible deniability). cryptsetup (in core) opens VeraCrypt
+# volumes natively with `--type tcrypt --veracrypt`. This is the foundation the
+# Aegis password vault (aegis-vault) is built on — no external VeraCrypt binary.
+zulucrypt-gui
+cryptsetup-bin
+
+# --- firewall manager (user-requested) ---
+# gufw is the familiar GUI firewall manager. NOTE: ufw is installed but left
+# DISABLED — aegis-firewall's fail-closed nftables ruleset stays the active
+# firewall. Enabling ufw would flush/override it and can break the Tor
+# anonymity guarantee (see the hardware-security guide).
+gufw
+ufw
