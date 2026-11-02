@@ -1,34 +1,27 @@
 #!/bin/sh
-# Put the security apps into a "Security" FOLDER on the desktop (not loose icons).
-# xfdesktop shows a subdirectory of ~/Desktop as an openable folder, so every live
-# user gets a tidy ~/Desktop/Security/ holding every Aegis app plus the extra
-# security tools we ship. Runs after packages install, so the .desktop files
-# (Control Center, Tor Connection, Vault, Hardware Guide, I2P IRC, …) are present.
-# Launchers must be executable for the file manager to treat them as apps.
+# Put every security app launcher directly on the desktop as loose icons (no
+# subfolder). Runs after packages install, so the .desktop files (Control Center,
+# Tor Connection, Vault, Hardware Guide, I2P IRC, Disks, gufw, KeePassXC, …) are
+# present. Launchers must be executable for the file manager to run them as apps.
 set -e
 
 DESK=/etc/skel/Desktop
-SEC="$DESK/Security"
-mkdir -p "$SEC"
+mkdir -p "$DESK"
 
-# Every Aegis launcher, plus the third-party security tools we add. Glob patterns
-# that match nothing stay literal and are skipped by the -f test.
+# Every Aegis launcher plus the extra security tools we ship. Glob patterns that
+# match nothing stay literal and are skipped by the -f test.
 for f in /usr/share/applications/aegis-*.desktop \
          /usr/share/applications/org.gnome.DiskUtility.desktop \
          /usr/share/applications/*ufw*.desktop \
          /usr/share/applications/hexchat.desktop \
          /usr/share/applications/*keepassxc*.desktop \
-         /usr/share/applications/*KeePassXC*.desktop; do
-    [ -f "$f" ] && cp -f "$f" "$SEC/" || true
+         /usr/share/applications/*KeePassXC*.desktop \
+         /usr/share/applications/install-aegis.desktop; do
+    [ -f "$f" ] && cp -f "$f" "$DESK/" || true
 done
 
-# Pure background/helper entries don't belong in the folder (the app launchers,
-# including Tor Connection, are kept — these two are background-only).
-rm -f "$SEC/aegis-wallpaper.desktop" "$SEC/aegis-screensaver.desktop" 2>/dev/null || true
+# Pure background/helper entries don't belong on the desktop.
+rm -f "$DESK/aegis-wallpaper.desktop" "$DESK/aegis-screensaver.desktop" 2>/dev/null || true
 
-# Keep the installer icon on the desktop root (the most-wanted first action).
-[ -f /usr/share/applications/install-aegis.desktop ] && \
-    cp -f /usr/share/applications/install-aegis.desktop "$DESK/" || true
-
-chmod +x "$SEC"/*.desktop "$DESK"/*.desktop 2>/dev/null || true
-echo "I: seeded $DESK/Security with $(ls "$SEC"/*.desktop 2>/dev/null | wc -l) launcher(s)"
+chmod +x "$DESK"/*.desktop 2>/dev/null || true
+echo "I: seeded $DESK with $(ls "$DESK"/*.desktop 2>/dev/null | wc -l) launcher(s)"
